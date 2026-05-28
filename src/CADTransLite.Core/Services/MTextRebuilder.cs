@@ -325,7 +325,7 @@ public static class MTextRebuilder
     /// <summary>
     /// 获取字符的相对宽度。
     /// </summary>
-    private static double GetCharWidth(char ch)
+    internal static double GetCharWidth(char ch)
     {
         if (char.IsWhiteSpace(ch))
             return WidthSpace;

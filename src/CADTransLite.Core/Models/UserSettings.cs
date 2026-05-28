@@ -51,4 +51,29 @@ public sealed class UserSettings
     /// Default: "百度翻译"
     /// </summary>
     public string SelectedProvider { get; set; } = "百度翻译";
+
+    // ────────────────────────────────────────────────────────────────
+    // v3.0 Phase 4 — Layout adjust, Glossary, AI filter, DWG version
+    // ────────────────────────────────────────────────────────────────
+
+    /// <summary>是否启用布局自适应（翻译后文字过长时自动缩放字高）。默认 true。</summary>
+    public bool EnableLayoutAdjust { get; set; } = true;
+
+    /// <summary>是否启用术语表替换。默认 false。</summary>
+    public bool EnableGlossary { get; set; } = false;
+
+    /// <summary>术语表 JSON 文件路径。空字符串表示使用默认路径。</summary>
+    public string GlossaryPath { get; set; } = string.Empty;
+
+    /// <summary>是否启用 AI 智能过滤。默认 false。</summary>
+    public bool EnableAiFilter { get; set; } = false;
+
+    /// <summary>AI 过滤自定义 prompt 模板。空字符串表示使用默认模板。</summary>
+    public string AiFilterPrompt { get; set; } = string.Empty;
+
+    /// <summary>AI 过滤使用的模型名称。空字符串表示复用翻译 API 的 ModelName。</summary>
+    public string AiFilterModelName { get; set; } = string.Empty;
+
+    /// <summary>DWG 输出版本代码。默认 "ACAD2018"。</summary>
+    public string OutputDwgVersion { get; set; } = "ACAD2018";
 }

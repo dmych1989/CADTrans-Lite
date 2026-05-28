@@ -110,6 +110,14 @@ namespace CADTransLite.UI
         private bool _enableCleanedDedup = false;
 
         // ─────────────────────────────────────────────────────────────
+        // Phase 4 — Layout adjust, Glossary, AI filter, DWG version
+        // ─────────────────────────────────────────────────────────────
+        private bool _enableLayoutAdjust = true;
+        private bool _enableGlossary = false;
+        private bool _enableAiFilter = false;
+        private DwgOutputVersion? _selectedOutputVersion;
+
+        // ─────────────────────────────────────────────────────────────
         // Constructor
         // ─────────────────────────────────────────────────────────────
         public MainWindowViewModel()
@@ -136,6 +144,11 @@ namespace CADTransLite.UI
             SelectExcelCommand         = new RelayCommand(SelectExcelFile);
             BrowseTranslateExcelCommand = new RelayCommand(BrowseTranslateExcel);
             BrowseImportExcelCommand    = new RelayCommand(BrowseImportExcel);
+            BrowseGlossaryPathCommand   = new RelayCommand(BrowseGlossaryPath);
+            LoadGlossaryCommand         = new RelayCommand(LoadGlossary);
+            AddGlossaryEntryCommand     = new RelayCommand(AddGlossaryEntry);
+            RemoveGlossaryEntryCommand  = new RelayCommand(RemoveGlossaryEntry);
+            SaveGlossaryCommand         = new RelayCommand(SaveGlossary);
 
             // Load persisted settings, then detect ODA
             LoadSettings();
@@ -406,6 +419,87 @@ namespace CADTransLite.UI
             set { _enableCleanedDedup = value; OnPropertyChanged(); }
         }
 
+        // ─────────────────────────────────────────────────────────────
+        // Phase 4 — Layout adjust, Glossary, AI filter, DWG version properties
+        // ─────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 是否启用布局自适应（翻译后文字过长时自动缩放字高）。
+        /// </summary>
+        public bool EnableLayoutAdjust
+        {
+            get => _enableLayoutAdjust;
+            set { _enableLayoutAdjust = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// 是否启用术语表替换（Phase 4 预留占位，暂禁用）。
+        /// </summary>
+        public bool EnableGlossary
+        {
+            get => _enableGlossary;
+            set { _enableGlossary = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// 是否启用 AI 智能过滤（Phase 4 预留占位，暂禁用）。
+        /// </summary>
+        public bool EnableAiFilter
+        {
+            get => _enableAiFilter;
+            set { _enableAiFilter = value; OnPropertyChanged(); }
+        }
+
+        private string _aiFilterPrompt = string.Empty;
+        /// <summary>AI 过滤自定义 prompt 模板。</summary>
+        public string AiFilterPrompt
+        {
+            get => _aiFilterPrompt;
+            set { _aiFilterPrompt = value; OnPropertyChanged(); }
+        }
+
+        private string _aiFilterModelName = string.Empty;
+        /// <summary>AI 过滤使用的模型名称。空则复用翻译 API 的 ModelName。</summary>
+        public string AiFilterModelName
+        {
+            get => _aiFilterModelName;
+            set { _aiFilterModelName = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// 选中的 DWG 输出版本。
+        /// </summary>
+        public DwgOutputVersion? SelectedOutputVersion
+        {
+            get => _selectedOutputVersion;
+            set { _selectedOutputVersion = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// 所有支持的 DWG 输出版本列表。
+        /// </summary>
+        public List<DwgOutputVersion> OutputVersions { get; } = DwgOutputVersion.GetAllVersions();
+
+        // ─────────────────────────────────────────────────────────────
+        // Phase 4 — Glossary properties
+        // ─────────────────────────────────────────────────────────────
+
+        private string _glossaryPath = string.Empty;
+        /// <summary>术语表文件路径。</summary>
+        public string GlossaryPath
+        {
+            get => _glossaryPath;
+            set { _glossaryPath = value; OnPropertyChanged(); }
+        }
+
+        private ObservableCollection<GlossaryEntry> _glossaryEntries = new();
+        /// <summary>术语条目列表（用于 UI 绑定）。</summary>
+        public ObservableCollection<GlossaryEntry> GlossaryEntries
+        {
+            get => _glossaryEntries;
+            set { _glossaryEntries = value; OnPropertyChanged(); }
+        }
+
         // Stub properties for unused checkboxes in XAML (no-op, just prevent binding errors)
         public bool ImportProxyObjects  { get; set; } = true;
         public bool ImportDimensionText { get; set; } = false;
@@ -474,6 +568,11 @@ namespace CADTransLite.UI
         public IRelayCommand      SelectExcelCommand        { get; }
         public IRelayCommand      BrowseTranslateExcelCommand { get; }
         public IRelayCommand      BrowseImportExcelCommand    { get; }
+        public IRelayCommand      BrowseGlossaryPathCommand   { get; }
+        public IRelayCommand      LoadGlossaryCommand         { get; }
+        public IRelayCommand      AddGlossaryEntryCommand     { get; }
+        public IRelayCommand      RemoveGlossaryEntryCommand  { get; }
+        public IRelayCommand      SaveGlossaryCommand         { get; }
 
         /// <summary>Alias: clicking the drop zone triggers the same as "select DWG file".</summary>
         public ICommand SelectDwgCommand => ExtractAndExportCommand;
@@ -586,6 +685,84 @@ namespace CADTransLite.UI
             {
                 ImportExcelPath = dlg.FileName;
                 StatusText = $"✅ 已选择导入 Excel：{Path.GetFileName(dlg.FileName)}";
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // Glossary commands
+        // ─────────────────────────────────────────────────────────────
+
+        private void BrowseGlossaryPath()
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "选择术语表 JSON 文件",
+                Filter = "JSON 文件 (*.json)|*.json|所有文件 (*.*)|*.*",
+                CheckFileExists = false,  // allow creating new
+            };
+            if (!string.IsNullOrEmpty(_glossaryPath))
+                dlg.InitialDirectory = Path.GetDirectoryName(_glossaryPath);
+
+            if (dlg.ShowDialog() == true)
+            {
+                GlossaryPath = dlg.FileName;
+                LoadGlossary();
+            }
+        }
+
+        private void LoadGlossary()
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(_glossaryPath) || !File.Exists(_glossaryPath))
+                {
+                    GlossaryEntries = new ObservableCollection<GlossaryEntry>();
+                    return;
+                }
+                var entries = GlossaryManager.LoadGlossary(_glossaryPath);
+                GlossaryEntries = new ObservableCollection<GlossaryEntry>(entries);
+                StatusText = $"已加载 {entries.Count} 条术语";
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"⚠️ 加载术语表失败：{ex.Message}";
+            }
+        }
+
+        private void AddGlossaryEntry()
+        {
+            GlossaryEntries.Add(new GlossaryEntry
+            {
+                SourceTerm = "新术语",
+                TargetTerm = "目标术语",
+                SourceLang = _sourceLanguage?.Code ?? "EN",
+                TargetLang = _targetLanguage?.Code ?? "ZH",
+            });
+        }
+
+        private void RemoveGlossaryEntry()
+        {
+            // Remove the last entry if any.
+            // User can also delete rows directly in the DataGrid via Delete key.
+            if (_glossaryEntries.Count > 0)
+                _glossaryEntries.RemoveAt(_glossaryEntries.Count - 1);
+        }
+
+        private void SaveGlossary()
+        {
+            try
+            {
+                string path = _glossaryPath;
+                if (string.IsNullOrEmpty(path))
+                    path = GlossaryManager.GetDefaultGlossaryPath();
+
+                GlossaryManager.SaveGlossary(_glossaryEntries.ToList(), path);
+                GlossaryPath = path;
+                StatusText = $"✅ 已保存 {_glossaryEntries.Count} 条术语到 {Path.GetFileName(path)}";
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"⚠️ 保存术语表失败：{ex.Message}";
             }
         }
 
@@ -786,6 +963,57 @@ namespace CADTransLite.UI
                 string srcLang = _sourceLanguage?.GetProviderCode(_selectedProvider) ?? _sourceLangCode;
                 string tgtLang = _targetLanguage?.GetProviderCode(_selectedProvider) ?? _targetLangCode;
 
+                // ── Phase 4: AI smart filter before translation ──
+                if (EnableAiFilter && itemsToTranslate.Count > 0)
+                {
+                    try
+                    {
+                        // Reuse Custom AI API settings for filtering
+                        string filterApiKey = _apiKey;
+                        string filterBaseUrl = _baseUrl;
+                        string filterModelName = string.IsNullOrWhiteSpace(_aiFilterModelName)
+                            ? (string.IsNullOrWhiteSpace(_modelName) ? "gpt-4o-mini" : _modelName)
+                            : _aiFilterModelName;
+
+                        if (string.IsNullOrWhiteSpace(filterApiKey) || string.IsNullOrWhiteSpace(filterBaseUrl))
+                        {
+                            StatusText = "⚠️ AI 过滤需要自定义AI API 配置（API Key 和 Base URL），请在设置中配置。";
+                        }
+                        else
+                        {
+                            StatusText = $"正在通过 AI 过滤文本（{itemsToTranslate.Count} 条）...";
+                            var filter = new AiTextFilter(filterApiKey, filterBaseUrl, filterModelName, _aiFilterPrompt);
+                            string filterSrcLang = _sourceLanguage?.Code ?? _sourceLangCode;
+                            string filterTgtLang = _targetLanguage?.Code ?? _targetLangCode;
+                            int skippedCount = await filter.FilterAsync(
+                                        itemsToTranslate, filterSrcLang, filterTgtLang,
+                                        protectTableHeaders: true,
+                                        progress: MakeProgress(0, 10, "AI过滤"),
+                                        cancellationToken: cancellationToken);
+
+                            // Mark SKIP items so they won't be translated
+                            // Set TranslatedText to OriginalText so TranslationService skips them
+                            // (TranslationService only translates items with empty TranslatedText)
+                            foreach (var item in itemsToTranslate)
+                            {
+                                if (item.AiFilterDecision == "SKIP")
+                                {
+                                    item.Status = "skipped";
+                                    item.TranslatedText = item.OriginalText ?? string.Empty;
+                                }
+                            }
+
+                            if (skippedCount > 0)
+                                StatusText = $"AI 过滤完成：{skippedCount} 条被跳过，{itemsToTranslate.Count - skippedCount} 条待翻译";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // AI filter failure should not block translation
+                        StatusText = $"⚠️ AI 过滤失败（将继续翻译全部文本）：{ex.Message}";
+                    }
+                }
+
                 // Filter items that need translation
                 var toTranslate = itemsToTranslate.Where(i => string.IsNullOrWhiteSpace(i.TranslatedText)).ToList();
                 StatusText = $"正在通过 {api.Name} 翻译 {toTranslate.Count} 条文本...";
@@ -797,6 +1025,18 @@ namespace CADTransLite.UI
                     tgtLang,
                     progress,
                     cancellationToken);
+
+                // ── Phase 4: Apply glossary after translation ──
+                if (EnableGlossary && _glossaryEntries.Count > 0)
+                {
+                    StatusText = $"正在应用术语表（{_glossaryEntries.Count} 条术语）...";
+                    string glossarySrcLang = _sourceLanguage?.Code ?? _sourceLangCode;
+                    string glossaryTgtLang = _targetLanguage?.Code ?? _targetLangCode;
+                    int replacedCount = GlossaryManager.ApplyGlossary(
+                        itemsToTranslate, _glossaryEntries.ToList(), glossarySrcLang, glossaryTgtLang);
+                    if (replacedCount > 0)
+                        StatusText = $"术语表已应用：{replacedCount} 处替换";
+                }
 
                 // Auto-export translated Excel
                 ProgressValue = 95;
@@ -970,13 +1210,24 @@ namespace CADTransLite.UI
                     StatusText = $"已从 Excel 加载 {importList.Count} 条（独立模式）";
                 }
 
+                // ── Phase 4: Apply glossary before write-back ──
+                if (EnableGlossary && _glossaryEntries.Count > 0)
+                {
+                    string glossarySrcLang = _sourceLanguage?.Code ?? _sourceLangCode;
+                    string glossaryTgtLang = _targetLanguage?.Code ?? _targetLangCode;
+                    int replacedCount = GlossaryManager.ApplyGlossary(
+                        items, _glossaryEntries.ToList(), glossarySrcLang, glossaryTgtLang);
+                    if (replacedCount > 0)
+                        StatusText = $"术语表已应用：{replacedCount} 处替换";
+                }
+
                 // ── Step C: Write back into DXF ───────────────────
                 StatusText    = "正在回填译文到 DXF...";
                 ProgressValue = 50;
 
                 var writeProgress = MakeProgress(50, 85, "回填中");
                 (string translatedDxf, List<string> log) = await Task.Run(
-                    () => _dwgWriter.WriteBack(dxfFile, items, writeProgress),
+                    () => _dwgWriter.WriteBack(dxfFile, items, writeProgress, enableLayoutAdjust: EnableLayoutAdjust),
                     cancellationToken);
 
                 // ── Step D: DXF → DWG if original was DWG ─────────
@@ -986,7 +1237,8 @@ namespace CADTransLite.UI
                     StatusText    = "正在将已翻译 DXF 转换回 DWG...";
                     ProgressValue = 88;
                     string outputDir = Path.GetDirectoryName(translatedDxf)!;
-                    finalOutputFile  = await _odaConverter.DxfToDwgAsync(translatedDxf, outputDir, cancellationToken);
+                    string? versionCode = SelectedOutputVersion?.VersionCode;
+                    finalOutputFile  = await _odaConverter.DxfToDwgAsync(translatedDxf, outputDir, versionCode, cancellationToken);
                 }
 
                 ProgressValue = 100;
@@ -1174,6 +1426,13 @@ namespace CADTransLite.UI
             SourceLanguageCode = _sourceLanguage?.Code ?? _sourceLangCode.ToUpperInvariant(),
             TargetLanguageCode = _targetLanguage?.Code ?? _targetLangCode.ToUpperInvariant(),
             SelectedProvider   = _selectedProvider,
+            EnableLayoutAdjust = _enableLayoutAdjust,
+            EnableGlossary     = _enableGlossary,
+            EnableAiFilter     = _enableAiFilter,
+            AiFilterPrompt     = _aiFilterPrompt,
+            AiFilterModelName  = _aiFilterModelName,
+            GlossaryPath       = _glossaryPath,
+            OutputDwgVersion   = _selectedOutputVersion?.VersionCode ?? "ACAD2018",
             Import = new ImportSettings
             {
                 ImportBlockAttributes = _importBlockAttributes,
@@ -1204,6 +1463,8 @@ namespace CADTransLite.UI
                 ApiKey                  = _apiKey,
                 BaseUrl                 = _baseUrl,
                 ModelName               = _modelName,
+                AiFilterPrompt          = _aiFilterPrompt,
+                AiFilterModelName       = _aiFilterModelName,
             },
         };
 
@@ -1248,7 +1509,28 @@ namespace CADTransLite.UI
             _baseUrl                  = api.BaseUrl;
             _modelName                = api.ModelName;
 
+            // Phase 4 settings
+            _enableLayoutAdjust  = s.EnableLayoutAdjust;
+            _enableGlossary      = s.EnableGlossary;
+            _enableAiFilter      = s.EnableAiFilter;
+            _aiFilterPrompt      = s.AiFilterPrompt ?? string.Empty;
+            _aiFilterModelName   = s.AiFilterModelName ?? string.Empty;
+            _glossaryPath        = s.GlossaryPath ?? string.Empty;
+            _selectedOutputVersion = OutputVersions.FirstOrDefault(v => v.VersionCode == s.OutputDwgVersion) ?? OutputVersions[0];
+
             _odaConverter.ExecutablePath = _odaPath;
+
+            // Notify AI filter properties
+            OnPropertyChanged(nameof(AiFilterPrompt));
+            OnPropertyChanged(nameof(AiFilterModelName));
+
+            // Auto-load glossary if path exists
+            if (!string.IsNullOrEmpty(_glossaryPath) && File.Exists(_glossaryPath))
+            {
+                var entries = GlossaryManager.LoadGlossary(_glossaryPath);
+                _glossaryEntries = new ObservableCollection<GlossaryEntry>(entries);
+                OnPropertyChanged(nameof(GlossaryEntries));
+            }
         }
 
         /// <summary>Builds an ImportSettings from current ViewModel values.</summary>
@@ -1262,6 +1544,9 @@ namespace CADTransLite.UI
             ImportOffLayers       = _importOffLayers,
             UseRichExcelFormat    = _useRichExcelFormat,
             EnableCleanedDedup    = _enableCleanedDedup,
+            EnableLayoutAdjust    = _enableLayoutAdjust,
+            EnableAiFilter        = _enableAiFilter,
+            EnableGlossary        = _enableGlossary,
         };
 
         /// <summary>

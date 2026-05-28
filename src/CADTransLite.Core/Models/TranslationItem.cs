@@ -152,6 +152,16 @@ public sealed class TranslationItem
     /// <summary>备注字段，用于记录额外信息。</summary>
     public string? Remark { get; set; }
 
+    // ────────────────────────────────────────────────────────────────
+    // v3.0 Phase 4 — AI filter & layout adjustment
+    // ────────────────────────────────────────────────────────────────
+
+    /// <summary>AI 过滤判定结果："KEEP" 或 "SKIP"。null 表示未经过 AI 过滤。</summary>
+    public string? AiFilterDecision { get; set; }
+
+    /// <summary>AI 过滤判定的理由。null 表示未经过 AI 过滤。</summary>
+    public string? AiFilterReason { get; set; }
+
     /// <inheritdoc/>
     public override string ToString() =>
         $"[{EntityType}] Handle={Handle} Text=\"{OriginalText}\"";

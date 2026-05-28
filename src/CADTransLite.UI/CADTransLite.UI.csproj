@@ -7,6 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>CADTransLite.UI</RootNamespace>
     <AssemblyName>CADTransLite.UI</AssemblyName>
+    <ApplicationIcon>Images\app.ico</ApplicationIcon>
     <EnableNuGetPackageRestore>false</EnableNuGetPackageRestore>
     <RestorePackages>false</RestorePackages>
     <DisableImplicitNuGetPackageReference>true</DisableImplicitNuGetPackageReference>

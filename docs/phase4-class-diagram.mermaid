@@ -1,0 +1,168 @@
+classDiagram
+    direction TB
+
+    class DxfLayoutAdjuster {
+        -double _minScaleFactor
+        +double MinScaleFactor$
+        +AdjustLayout(dxfFilePath, items, progress) (int, List~string~)
+        -CalculateVisualWidth(text, fontSize) double
+        -FindAndModifyGroupCode(lines, handle, groupCode, newValue) bool
+        -ScaleTextHeight(lines, textInfo, scaleFactor) bool
+        -UpdateMtextBoundary(lines, mtextInfo, newWidth) bool
+    }
+
+    class GlossaryManager {
+        -string _glossaryDirectory$
+        +LoadGlossary(glossaryPath) List~GlossaryEntry~
+        +SaveGlossary(entries, glossaryPath) void
+        +ApplyGlossary(items, entries, sourceLang, targetLang) int
+        -MatchAndReplace(text, entries, sourceLang, targetLang) string
+        +GetDefaultGlossaryPath() string
+        +EnsureDefaultGlossary() void
+    }
+
+    class AiTextFilter {
+        -TranslationApiSettings _settings
+        -HttpClient _httpClient
+        +FilterItemsAsync(items, config, progress, cancellationToken) Task~int~
+        -BuildFilterPrompt(items, config) string
+        -ParseFilterResponse(response, itemCount) List~AiFilterDecision~
+        -CallAiApiAsync(prompt, config, cancellationToken) Task~string~
+    }
+
+    class GlossaryEntry {
+        +string SourceTerm
+        +string TargetTerm
+        +string SourceLang
+        +string TargetLang
+        +bool IsCaseSensitive
+        +bool IsRegex
+        +string Category
+        +string Remark
+    }
+
+    class GlossaryConfig {
+        +string GlossaryPath
+        +bool EnableGlossary
+        +bool AutoMatchCase
+        +List~GlossaryEntry~ Entries
+    }
+
+    class AiFilterConfig {
+        +string FilterPrompt
+        +string ModelName
+        +bool ProtectTableHeaders
+        +int BatchSize
+        +string SourceLang
+        +string TargetLang
+    }
+
+    class DwgOutputVersion {
+        <<static>>
+        +string VersionCode
+        +string DisplayName
+        +GetAllVersions() List~DwgOutputVersion~
+        +GetDefault() DwgOutputVersion
+    }
+
+    class OdaSettings {
+        +string ExecutablePath
+        +string AcadVersion
+        +string OutputAcadVersion
+        +bool IsAvailable
+        +DefaultExecutablePath$
+    }
+
+    class TranslationItem {
+        +string Handle
+        +EntityType EntityType
+        +string RawOriginalText
+        +string OriginalText
+        +string TranslatedText
+        +Dictionary~string,string~ FormatPlaceholders
+        +string LayerName
+        +int ExcelRowIndex
+        +List~string~ CadHandles
+        +List~TranslationItem~ MergedItems
+        +string BlockName
+        +string AttributeTag
+        +int TableRow
+        +int TableColumn
+        +string FilterReason
+        +string CleanedText
+        +string Status
+        +string Remark
+        +string AiFilterDecision
+        +string AiFilterReason
+    }
+
+    class UserSettings {
+        +string OdaPath
+        +ImportSettings Import
+        +string ExportSuffix
+        +TranslationApiSettings TranslationApi
+        +string SourceLanguageCode
+        +string TargetLanguageCode
+        +string SelectedProvider
+        +bool EnableLayoutAdjust
+        +bool EnableGlossary
+        +string GlossaryPath
+        +bool EnableAiFilter
+        +string AiFilterPrompt
+        +string AiFilterModelName
+        +string OutputDwgVersion
+    }
+
+    class ImportSettings {
+        +bool ImportProxyObjects
+        +bool ImportBlockAttributes
+        +bool ImportDimensionText
+        +bool ImportMTextParagraph
+        +bool ImportMTextWhole
+        +bool ImportFrozenLayers
+        +bool ImportLockedLayers
+        +bool ImportOffLayers
+        +DxfTextCleanerConfig CleanerConfig
+        +bool EnableTextCleaning
+        +bool ImportAcadTables
+        +bool ImportMultiLeaders
+        +bool EnableCleanedDedup
+        +bool UseRichExcelFormat
+        +bool EnableLayoutAdjust
+        +bool EnableAiFilter
+        +bool EnableGlossary
+    }
+
+    class TranslationApiSettings {
+        +bool EnableCustomAI
+        +string ApiKey
+        +string BaseUrl
+        +string ModelName
+        +bool EnableDeepL
+        +string DeepLApiKey
+        +bool EnableBaiduTranslate
+        +string BaiduAppId
+        +string BaiduAppKey
+        +bool EnableTencentTranslate
+        +string TencentSecretId
+        +string TencentSecretKey
+        +bool EnableMicrosoftTranslate
+        +string MicrosoftApiKey
+        +string MicrosoftRegion
+        +bool EnableDeepLX
+        +string DeepLXUrl
+        +string AiFilterPrompt
+        +string AiFilterModelName
+    }
+
+    DxfLayoutAdjuster --> TranslationItem : adjusts
+    DxfLayoutAdjuster --> DxfRawParser : uses
+    GlossaryManager --> GlossaryEntry : manages
+    GlossaryManager --> TranslationItem : applies to
+    AiTextFilter --> TranslationItem : filters
+    AiTextFilter --> TranslationApiSettings : uses config
+    AiTextFilter --> AiFilterConfig : configured by
+    UserSettings --> ImportSettings : contains
+    UserSettings --> TranslationApiSettings : contains
+    UserSettings --> DwgOutputVersion : references
+    OdaSettings --> DwgOutputVersion : uses version

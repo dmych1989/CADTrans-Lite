@@ -5,6 +5,7 @@
 ![.NET 9](https://img.shields.io/badge/.NET-9.0-blue)
 ![WPF](https://img.shields.io/badge/UI-WPF-purple)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![Version](https://img.shields.io/badge/Version-3.4-orange)
 
 ---
 
@@ -57,6 +58,16 @@ CAD 文件      API 翻译      新 CAD 文件
 
 - 输入 .dwg 文件自动转 DXF 进行处理
 - 输出可选择 DXF 或 DWG 格式
+- 支持 DWG 输出版本选择（ACAD 2000/2004/2007/2010/2013/2018）
+
+### Phase 4 新功能 (v3.4)
+
+| 功能 | 说明 |
+| --- | --- |
+| 布局自适应 | 翻译后文字过长时自动缩放字高 + 刷新 MTEXT 边界宽度（最小 0.65x） |
+| 术语表系统 | JSON 持久化术语表，翻译后自动应用术语替换，支持 DataGrid 原生编辑 |
+| AI 智能过滤 | 翻译前用 AI 判断文本是否需要翻译（KEEP/SKIP），过滤尺寸/公差/符号等 |
+| DWG 版本选择 | 回填输出时可选择 DWG 版本（ACAD 2000~2018） |
 
 ---
 
@@ -163,6 +174,9 @@ CADTrans Lite/
 │   │       ├── MicrosoftTranslator.cs   # 微软翻译
 │   │       ├── CustomAiTranslator.cs    # 自定义 API 翻译
 │   │       ├── OdaConverter.cs          # ODA DWG↔DXF 转换
+│   │       ├── DxfLayoutAdjuster.cs     # 布局自适应（Phase 4）
+│   │       ├── GlossaryManager.cs       # 术语表管理（Phase 4）
+│   │       ├── AiTextFilter.cs          # AI 智能过滤（Phase 4）
 │   │       └── ...                      # 其他服务
 │   │
 │   ├── CADTransLite.UI/                 # WPF 用户界面
@@ -183,6 +197,7 @@ CADTrans Lite/
 │   ├── PRD-v2.1.md
 │   ├── phase2-architecture.md           # Phase 2 架构设计
 │   ├── phase3-architecture.md           # Phase 3 架构设计
+│   ├── phase4-architecture.md           # Phase 4 架构设计
 │   ├── class-diagram.mermaid            # 类图
 │   └── sequence-diagram.mermaid         # 时序图
 │
@@ -203,6 +218,9 @@ DwgWriter 采用**纯原始 DXF 行级文本替换**，而非 netDxf 的 Load/Sa
               → DxfRawParser 解析 TEXT/MTEXT/ATTRIB 实体的 Handle 和行号
               → 在行级别精准替换文本值
               → DxfTextReplacer 处理 ACAD_TABLE/MLEADER
+              → DxfLayoutAdjuster 布局自适应（字高缩放 + MTEXT 边界刷新）
+              → GlossaryManager 应用术语替换（可选）
+              → AiTextFilter AI 过滤 SKIP 条目（可选）
               → File.WriteAllLines 保存
 ```
 

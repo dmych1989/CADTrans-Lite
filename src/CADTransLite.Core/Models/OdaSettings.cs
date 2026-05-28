@@ -18,6 +18,9 @@ public sealed class OdaSettings
     /// <summary>AutoCAD version to target for conversion.</summary>
     public string AcadVersion { get; set; } = "ACAD2018";
 
+    /// <summary>DXF→DWG 转换时使用的输出 AutoCAD 版本。默认 "ACAD2018"。</summary>
+    public string OutputAcadVersion { get; set; } = "ACAD2018";
+
     /// <summary>Whether the ODA File Converter is available on this system.</summary>
     public bool IsAvailable => File.Exists(ExecutablePath);
 }

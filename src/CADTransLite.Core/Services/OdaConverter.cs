@@ -171,6 +171,7 @@ public sealed class OdaConverter
     public async Task<string> DxfToDwgAsync(
         string dxfPath,
         string outputDir,
+        string? outputVersion = null,
         CancellationToken cancellationToken = default)
     {
         Log($"=== DxfToDwgAsync START ===");
@@ -197,8 +198,10 @@ public sealed class OdaConverter
         try
         {
             // ODA CLI: ODAFileConverter.exe "<input_dir>" "<output_dir>" <version> <format> <recurse> <audit> <filter>
-            string arguments = $"\"{tempInputDir}\" \"{outputDir}\" {_settings.AcadVersion} DWG 0 0 \"*.dwg;*.dxf\"";
+            string version = !string.IsNullOrWhiteSpace(outputVersion) ? outputVersion : _settings.AcadVersion;
+            string arguments = $"\"{tempInputDir}\" \"{outputDir}\" {version} DWG 0 0 \"*.dwg;*.dxf\"";
             Log($"ODA arguments: {arguments}");
+            Log($"Output version: {version}");
             await RunOdaAsync(arguments, cancellationToken);
 
             string outputDwg = Path.Combine(outputDir,

@@ -126,4 +126,14 @@ public sealed class TranslationApiSettings
     /// Default: http://127.0.0.1:1188
     /// </summary>
     public string DeepLXUrl { get; set; } = "http://127.0.0.1:1188";
+
+    // ────────────────────────────────────────────────────────────────
+    // v3.0 Phase 4 — AI filter settings
+    // ────────────────────────────────────────────────────────────────
+
+    /// <summary>AI 过滤自定义 prompt 模板。空字符串表示使用默认模板。</summary>
+    public string AiFilterPrompt { get; set; } = string.Empty;
+
+    /// <summary>AI 过滤使用的模型名称。空字符串表示复用 ModelName。</summary>
+    public string AiFilterModelName { get; set; } = string.Empty;
 }

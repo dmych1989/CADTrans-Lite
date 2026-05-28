@@ -98,4 +98,17 @@ public sealed class ImportSettings
     /// 默认 true。
     /// </summary>
     public bool UseRichExcelFormat { get; set; } = true;
+
+    // ────────────────────────────────────────────────────────────────
+    // v3.0 Phase 4 — Feature toggles
+    // ────────────────────────────────────────────────────────────────
+
+    /// <summary>是否启用布局自适应。默认 true。</summary>
+    public bool EnableLayoutAdjust { get; set; } = true;
+
+    /// <summary>是否启用 AI 智能过滤。默认 false。</summary>
+    public bool EnableAiFilter { get; set; } = false;
+
+    /// <summary>是否启用术语表替换。默认 false。</summary>
+    public bool EnableGlossary { get; set; } = false;
 }

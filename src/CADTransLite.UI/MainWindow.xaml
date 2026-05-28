@@ -6,7 +6,8 @@
         xmlns:local="clr-namespace:CADTransLite.UI"
         xmlns:status="clr-namespace:CADTransLite.UI"
         mc:Ignorable="d"
-        Title="CADTrans Lite v3.0"
+        Title="CADTrans Lite v3.4"
+        Icon="pack://application:,,,/Images/logo.png"
         Height="780" Width="760"
         MinHeight="680" MinWidth="720"
         Background="#F5F5F5"
@@ -172,7 +173,7 @@
                 <!-- ──────────────────────────────────────────────────────────
                      Title
                      ────────────────────────────────────────────────────────── -->
-                <TextBlock Text="CADTrans Lite v3.0"
+                <TextBlock Text="CADTrans Lite v3.4"
                            FontSize="24" FontWeight="Bold"
                            Foreground="#1565C0" Margin="0,0,0,4" />
                 <TextBlock Text="DWG/DXF 文字提取  ›  翻译  ›  回填输出"
@@ -438,6 +439,120 @@
                                                   FontSize="11"
                                                   ToolTip="启用后，合并阶段会按 (类型+清洗文本) 进行二次去重，减少翻译行数" />
                                     </WrapPanel>
+
+                                    <!-- Phase 4: Layout adjustment, Glossary, AI filter, DWG version -->
+                                    <TextBlock Text="回填与输出:" FontWeight="Bold" FontSize="11" Margin="0,8,0,6" />
+                                    <StackPanel>
+                                        <CheckBox Content="启用布局自适应（文字过长自动缩放）"
+                                                  IsChecked="{Binding EnableLayoutAdjust}"
+                                                  Margin="0,4"
+                                                  FontSize="11"
+                                                  ToolTip="启用后，当译文比原文长导致文字溢出实体边界时，自动缩放字高使其适应" />
+                                        <CheckBox Content="启用术语表替换"
+                                                  IsChecked="{Binding EnableGlossary}"
+                                                  Margin="0,4"
+                                                  FontSize="11"
+                                                  ToolTip="启用术语表后，翻译完成时自动应用术语替换" />
+                                        <CheckBox Content="启用 AI 智能过滤"
+                                                  IsChecked="{Binding EnableAiFilter}"
+                                                  Margin="0,4"
+                                                  FontSize="11"
+                                                  ToolTip="启用后，翻译前自动用 AI 判断哪些文本不需要翻译" />
+                                        <Grid Margin="0,4,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Text="DWG 输出版本："
+                                                       FontSize="11"
+                                                       Foreground="#424242"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,8,0" />
+                                            <ComboBox Grid.Column="1"
+                                                      ItemsSource="{Binding OutputVersions}"
+                                                      SelectedItem="{Binding SelectedOutputVersion}"
+                                                      DisplayMemberPath="DisplayName"
+                                                      FontSize="11"
+                                                      Padding="6,4"
+                                                      ToolTip="选择输出的 DWG 文件版本（需要 ODA File Converter）" />
+                                        </Grid>
+
+                                        <!-- Glossary management -->
+                                        <StackPanel Margin="0,8,0,0" Visibility="{Binding EnableGlossary, Converter={x:Static local:BoolToVisibilityConverter.Instance}}">
+                                            <Grid Margin="0,0,0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0"
+                                                         Text="{Binding GlossaryPath, UpdateSourceTrigger=PropertyChanged}"
+                                                         FontSize="11" Padding="4,2"
+                                                         ToolTip="术语表 JSON 文件路径" />
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="4,0,0,0">
+                                                    <Button Content="浏览" Command="{Binding BrowseGlossaryPathCommand}"
+                                                            FontSize="10" Padding="8,2" Margin="2,0" />
+                                                    <Button Content="加载" Command="{Binding LoadGlossaryCommand}"
+                                                            FontSize="10" Padding="8,2" Margin="2,0" />
+                                                    <Button Content="保存" Command="{Binding SaveGlossaryCommand}"
+                                                            FontSize="10" Padding="8,2" Margin="2,0" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <DataGrid ItemsSource="{Binding GlossaryEntries}"
+                                                      AutoGenerateColumns="False"
+                                                      CanUserAddRows="True"
+                                                      CanUserDeleteRows="True"
+                                                      MaxHeight="200"
+                                                      FontSize="11"
+                                                      HeadersVisibility="Column"
+                                                      GridLinesVisibility="Horizontal"
+                                                      BorderThickness="1"
+                                                      BorderBrush="#E0E0E0"
+                                                      Margin="0,2,0,0">
+                                                <DataGrid.Columns>
+                                                    <DataGridTextColumn Header="源术语" Binding="{Binding SourceTerm, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                                                    <DataGridTextColumn Header="目标术语" Binding="{Binding TargetTerm, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                                                    <DataGridTextColumn Header="源语言" Binding="{Binding SourceLang, UpdateSourceTrigger=PropertyChanged}" Width="50" />
+                                                    <DataGridTextColumn Header="目标语言" Binding="{Binding TargetLang, UpdateSourceTrigger=PropertyChanged}" Width="50" />
+                                                    <DataGridCheckBoxColumn Header="区分大小写" Binding="{Binding IsCaseSensitive}" Width="Auto" />
+                                                    <DataGridTextColumn Header="分类" Binding="{Binding Category, UpdateSourceTrigger=PropertyChanged}" Width="60" />
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </StackPanel>
+
+                                        <!-- AI filter configuration -->
+                                        <StackPanel Margin="0,8,0,0" Visibility="{Binding EnableAiFilter, Converter={x:Static local:BoolToVisibilityConverter.Instance}}">
+                                            <TextBlock Text="AI 过滤配置" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,4" />
+                                            <Grid Margin="0,0,0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <TextBlock Grid.Row="0" Grid.Column="0" Text="过滤模型：" VerticalAlignment="Center" Margin="0,0,4,0" FontSize="11" />
+                                                <TextBox Grid.Row="0" Grid.Column="1"
+                                                         Text="{Binding AiFilterModelName, UpdateSourceTrigger=PropertyChanged}"
+                                                         FontSize="11" Padding="4,2"
+                                                         ToolTip="留空则复用翻译 API 的模型名" />
+                                                <TextBlock Grid.Row="1" Grid.Column="0" Text="过滤 Prompt：" VerticalAlignment="Top" Margin="0,4,4,0" FontSize="11" />
+                                                <TextBox Grid.Row="1" Grid.Column="1"
+                                                         Text="{Binding AiFilterPrompt, UpdateSourceTrigger=PropertyChanged}"
+                                                         FontSize="11" Padding="4,2"
+                                                         AcceptsReturn="True"
+                                                         TextWrapping="Wrap"
+                                                         MaxHeight="80"
+                                                         VerticalScrollBarVisibility="Auto"
+                                                         ToolTip="留空使用默认过滤 Prompt。支持占位符：{sourceLang}, {targetLang}, {texts}" />
+                                            </Grid>
+                                            <TextBlock Text="⚠️ AI 过滤复用「自定义AI」的 API Key 和 Base URL 配置"
+                                                       FontSize="10" Foreground="#FF666666" Margin="0,2,0,0"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </StackPanel>
                                 </StackPanel>
                             </Expander>
 
@@ -1036,20 +1151,15 @@
                 <!-- ──────────────────────────────────────────────────────────
                      Donation Section (Collapsible)
                      ────────────────────────────────────────────────────────── -->
-                <Border Background="White"
-                        BorderBrush="#E0E0E0"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Margin="0,20,0,0"
-                        HorizontalAlignment="Center">
-                    <Expander IsExpanded="False"
-                              Header="☕ 打赏支持"
-                              FontSize="13" FontWeight="SemiBold"
-                              Foreground="#5D4037"
-                              Cursor="Hand"
-                              HorizontalAlignment="Stretch">
-                        <StackPanel HorizontalAlignment="Center"
-                                    Margin="0,4,0,16">
+                <Expander IsExpanded="False"
+                          Header="☕ 打赏支持"
+                          FontSize="13" FontWeight="SemiBold"
+                          Foreground="#5D4037"
+                          Cursor="Hand"
+                          HorizontalAlignment="Center"
+                          Margin="0,20,0,0">
+                    <StackPanel HorizontalAlignment="Center"
+                                Margin="0,4,0,16">
 
                             <!-- QR Code Image -->
                             <Border Background="#FFF8E1"
@@ -1067,9 +1177,8 @@
                                        FontSize="10" Foreground="#9E9E9E"
                                        HorizontalAlignment="Center" />
 
-                        </StackPanel>
-                    </Expander>
-                </Border>
+                    </StackPanel>
+                </Expander>
 
                 <!-- Author WeChat Public Account (bottom of content) -->
                 <StackPanel Orientation="Horizontal"
@@ -1098,7 +1207,7 @@
                    Foreground="White"
                    Height="26">
             <StatusBarItem>
-                <TextBlock Text="CADTrans Lite v3.0  •  基于 netDxf + EPPlus + ODA"
+                <TextBlock Text="CADTrans Lite v3.4  •  基于 netDxf + EPPlus + ODA"
                            FontSize="10" Foreground="#BBDEFB" />
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">

@@ -32,7 +32,8 @@ public sealed class DwgWriter
         string sourceFilePath,
         List<TranslationItem> mergedItems,
         IProgress<(int current, int total, string message)>? progress = null,
-        string suffix = "_translated")
+        string suffix = "_translated",
+        bool enableLayoutAdjust = true)
     {
         if (!File.Exists(sourceFilePath))
             throw new FileNotFoundException($"找不到源 DXF 文件：{sourceFilePath}", sourceFilePath);
@@ -231,6 +232,25 @@ public sealed class DwgWriter
             }
         }
 
+        // ---------------------------------------------------------------
+        // Step 8: Layout adjustment (Phase 4 - V3-4.1)
+        // Adjusts text height and MTEXT boundaries when translated text overflows.
+        // ---------------------------------------------------------------
+        if (enableLayoutAdjust)
+        {
+            progress?.Report((95, 100, "Adjusting layout…"));
+            try
+            {
+                var (adjustedCount, adjustLog) = DxfLayoutAdjuster.AdjustLayout(outputPath, mergedItems, progress);
+                log.AddRange(adjustLog);
+                log.Add($"[INFO] Layout adjustment: {adjustedCount} entities adjusted.");
+            }
+            catch (Exception ex)
+            {
+                log.Add($"[WARN] Layout adjustment failed: {ex.Message}");
+            }
+        }
+
         progress?.Report((100, 100, "Done"));
         return (outputPath, log);
     }
@@ -395,6 +415,8 @@ public sealed class DwgWriter
         CleanedText = src.CleanedText,
         Status = src.Status,
         Remark = src.Remark,
+        AiFilterDecision = src.AiFilterDecision,
+        AiFilterReason = src.AiFilterReason,
     };
 
     private static string TruncateLog(string text, int maxLen = 60) =>
