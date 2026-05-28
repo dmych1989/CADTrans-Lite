@@ -10,7 +10,7 @@
 
 ## 功能特性
 
-![](file:///D:/GitHub/CADTrans%20Lite/images/%E8%BD%AF%E4%BB%B6%E6%88%AA%E5%9B%BE3.0.png)
+![](https://github.com/dmych1989/CADTrans-Lite/blob/main/images/%E8%BD%AF%E4%BB%B6%E6%88%AA%E5%9B%BE3.0.png)
 
 ### 核心工作流：三步翻译
 
@@ -347,5 +347,5 @@ A：确保 Excel 的行数和提取时一致（2 列格式），或使用 11 列
 - [CommunityToolkit.Mvvm](https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/) — MVVM 框架
 
 ## 打赏
-
+![](https://github.com/dmych1989/CADTrans-Lite/blob/main/images/%E6%89%93%E8%B5%8F%E4%BA%8C%E7%BB%B4%E7%A0%81.jpg)
 
