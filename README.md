@@ -10,7 +10,7 @@
 
 ## 功能特性
 
-![](file:///D:/GitHub/CADTrans%20Lite/images/%E8%BD%AF%E4%BB%B6%E6%88%AA%E5%9B%BE3.0.png)
+![](https://github.com/dmych1989/CADTrans-Lite/blob/main/images/%E8%BD%AF%E4%BB%B6%E6%88%AA%E5%9B%BE3.0.png)
 
 ### 核心工作流：三步翻译
 
