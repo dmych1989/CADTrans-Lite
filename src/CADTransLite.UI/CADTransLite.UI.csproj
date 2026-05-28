@@ -19,6 +19,11 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Embedded images -->
+    <Resource Include="Images\**" />
+  </ItemGroup>
+
   <!-- Disable package resolution -->
   <PropertyGroup>
     <GenerateDependencyFile>false</GenerateDependencyFile>

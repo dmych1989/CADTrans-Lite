@@ -10,6 +10,8 @@
 
 ## 功能特性
 
+![](file:///D:/GitHub/CADTrans%20Lite/images/%E8%BD%AF%E4%BB%B6%E6%88%AA%E5%9B%BE3.0.png)
+
 ### 核心工作流：三步翻译
 
 ```
@@ -23,23 +25,23 @@ CAD 文件      API 翻译      新 CAD 文件
 
 ### 支持的 CAD 实体类型
 
-| 实体类型 | 说明 | 回写方式 |
-|---------|------|---------|
-| TEXT | 单行文字 | 原始 DXF 行级替换 |
-| MTEXT | 多行文字 | 原始 DXF 行级替换（支持 MText 格式码） |
-| ATTRIB | 块属性 | 原始 DXF 行级替换（InsertHandle::Tag 组合键） |
-| ACAD_TABLE | AutoCAD 表格 | DxfTextReplacer 原始标签替换 |
-| MULTILEADER | 多重引线 | DxfTextReplacer 原始标签替换 |
+| 实体类型        | 说明         | 回写方式                               |
+| ----------- | ---------- | ---------------------------------- |
+| TEXT        | 单行文字       | 原始 DXF 行级替换                        |
+| MTEXT       | 多行文字       | 原始 DXF 行级替换（支持 MText 格式码）          |
+| ATTRIB      | 块属性        | 原始 DXF 行级替换（InsertHandle::Tag 组合键） |
+| ACAD_TABLE  | AutoCAD 表格 | DxfTextReplacer 原始标签替换             |
+| MULTILEADER | 多重引线       | DxfTextReplacer 原始标签替换             |
 
 ### 支持的翻译引擎
 
-| 引擎 | 需要的配置 |
-|------|-----------|
-| 百度翻译 | App ID + Secret Key |
-| 腾讯翻译 | Secret ID + Secret Key |
-| DeepL | Auth Key |
-| DeepLX | Base URL（自建 DeepLX 服务） |
-| 微软翻译 | Subscription Key + Region |
+| 引擎      | 需要的配置                       |
+| ------- | --------------------------- |
+| 百度翻译    | App ID + Secret Key         |
+| 腾讯翻译    | Secret ID + Secret Key      |
+| DeepL   | Auth Key                    |
+| DeepLX  | Base URL（自建 DeepLX 服务）      |
+| 微软翻译    | Subscription Key + Region   |
 | 自定义 API | URL + API Key（兼容 OpenAI 格式） |
 
 ### Excel 翻译表格式
@@ -52,6 +54,7 @@ CAD 文件      API 翻译      新 CAD 文件
 ### DWG 支持
 
 通过 ODA File Converter 实现 DWG ↔ DXF 互转：
+
 - 输入 .dwg 文件自动转 DXF 进行处理
 - 输出可选择 DXF 或 DWG 格式
 
@@ -208,6 +211,7 @@ DwgWriter 采用**纯原始 DXF 行级文本替换**，而非 netDxf 的 Load/Sa
 ### MText 格式码处理
 
 MText 使用 DXF 格式码（如 `\P` 换行、`{\fSimSun...}` 字体定义等）。翻译时：
+
 1. `MTextCodec.StripForTranslation` — 剥离格式码，提取纯文本
 2. 翻译纯文本
 3. `MTextRebuilder.Rebuild` — 将翻译后文本重新嵌入 MText 格式码框架
@@ -304,12 +308,12 @@ dotnet test CADTransLite.Tests
 
 ## 主要依赖
 
-| 包 | 版本 | 用途 |
-|----|------|-----|
-| netDxf | 2024.9.2.1 | DXF 文件解析（提取阶段） |
-| EPPlus | 7.5.2 | Excel 文件读写 |
-| CommunityToolkit.Mvvm | 8.2.1 | MVVM 框架（源码生成器） |
-| .NET | 9.0 | 运行时 |
+| 包                     | 版本         | 用途             |
+| --------------------- | ---------- | -------------- |
+| netDxf                | 2024.9.2.1 | DXF 文件解析（提取阶段） |
+| EPPlus                | 7.5.2      | Excel 文件读写     |
+| CommunityToolkit.Mvvm | 8.2.1      | MVVM 框架（源码生成器） |
+| .NET                  | 9.0        | 运行时            |
 
 ---
 
@@ -341,3 +345,7 @@ A：确保 Excel 的行数和提取时一致（2 列格式），或使用 11 列
 - [EPPlus](https://github.com/EPPlusSoftware/EPPlus) — Excel 操作库
 - [DocuTranslate](https://github.com/DocuTranslate-for-engineer) — 参考了其 DXF 原始文本替换思路
 - [CommunityToolkit.Mvvm](https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/) — MVVM 框架
+
+## 打赏
+
+

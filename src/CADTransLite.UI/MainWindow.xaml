@@ -1033,6 +1033,63 @@
                     <Run Text="拖入 .dwg/.dxf → ①提取导出（可手动编辑 Excel 译文列）→ ②一键翻译（可选）→ ③导入回填 → 生成新 CAD 文件" />
                 </TextBlock>
 
+                <!-- ──────────────────────────────────────────────────────────
+                     Donation & Author Section
+                     ────────────────────────────────────────────────────────── -->
+                <Border Background="White"
+                        BorderBrush="#E0E0E0"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="20,16"
+                        Margin="0,20,0,8"
+                        HorizontalAlignment="Center">
+                    <StackPanel HorizontalAlignment="Center">
+
+                        <!-- Section Title -->
+                        <TextBlock Text="☕ 觉得有用？请作者喝杯咖啡"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="#5D4037"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,12" />
+
+                        <!-- QR Code Image -->
+                        <Border Background="#FFF8E1"
+                                CornerRadius="6"
+                                Padding="12"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,12">
+                            <Image Source="pack://application:,,,/Images/打赏二维码.jpg"
+                                   Width="200" Height="200"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   ToolTip="微信扫码打赏" />
+                        </Border>
+
+                        <TextBlock Text="微信扫码打赏"
+                                   FontSize="10" Foreground="#9E9E9E"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,16" />
+
+                        <!-- Separator -->
+                        <Border Height="1" Background="#E0E0E0" Margin="0,0,0,12" />
+
+                        <!-- Author WeChat Public Account -->
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center">
+                            <TextBlock Text="作者公众号：" FontSize="11" Foreground="#616161"
+                                       VerticalAlignment="Center" />
+                            <TextBlock FontSize="11" VerticalAlignment="Center">
+                                <Hyperlink NavigateUri="http://mp.weixin.qq.com/mp/homepage?__biz=MzA4NjQ2MDYzMA==&amp;hid=1&amp;sn=bb2531d86a7d41ca361cca9081151faa&amp;scene=18#wechat_redirect"
+                                           RequestNavigate="Hyperlink_RequestNavigate"
+                                           Foreground="#1565C0"
+                                           FontWeight="SemiBold">
+                                    山医命象卜
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+
+                    </StackPanel>
+                </Border>
+
             </StackPanel>
         </ScrollViewer>
 
