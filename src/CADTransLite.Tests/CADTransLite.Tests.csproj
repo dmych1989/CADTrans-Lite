@@ -1,0 +1,42 @@
+<!-- CADTransLite.Tests.csproj -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <!-- Do NOT set OutputType=Library for MSTest — it prevents runtime DLL copy -->
+    <RootNamespace>CADTransLite.Tests</RootNamespace>
+    <AssemblyName>CADTransLite.Tests</AssemblyName>
+    <!-- EPPlus NonCommercial license -->
+    <EPPlusLicenseContext>NonCommercial</EPPlusLicenseContext>
+    <!-- Force NuGet to copy runtime DLLs for library projects -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Test framework: MSTest -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.1.1" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.1.1" />
+    <!-- Excel handling: EPPlus -->
+    <PackageReference Include="EPPlus" Version="7.5.2" />
+    <PackageReference Include="EPPlus.Interfaces" Version="7.5.0" />
+    <PackageReference Include="EPPlus.System.Drawing" Version="7.5.0" />
+    <!-- Microsoft.Extensions packages (EPPlus 7.5.2 dependencies) -->
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Physical" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Primitives" Version="9.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Project reference: CADTransLite.Core -->
+    <ProjectReference Include="..\CADTransLite.Core\CADTransLite.Core.csproj" />
+  </ItemGroup>
+
+</Project>

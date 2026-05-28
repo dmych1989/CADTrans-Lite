@@ -1,0 +1,75 @@
+<!-- Controls/LanguageSelector.xaml -->
+<UserControl x:Class="CADTransLite.UI.Controls.LanguageSelector"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:models="clr-namespace:CADTransLite.Core.Models"
+             xmlns:local="clr-namespace:CADTransLite.UI"
+             mc:Ignorable="d"
+             d:DesignHeight="60" d:DesignWidth="400"
+             Name="RootControl">
+    
+    <UserControl.Resources>
+        <!-- 转换器：将 bool 转换为 FlowDirection -->
+        <local:LanguageInfoToFlowDirectionConverter x:Key="LangToFlowConverter"/>
+    </UserControl.Resources>
+    
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        
+        <!-- 源语言标签 -->
+        <TextBlock Grid.Column="0" 
+                   Text="源语言:"
+                   VerticalAlignment="Center"
+                   Margin="0,0,8,0"
+                   FontSize="12"/>
+        
+        <!-- 源语言选择器 -->
+        <ComboBox Grid.Column="1"
+                  x:Name="SourceLanguageCombo"
+                  ItemsSource="{Binding ElementName=RootControl, Path=Languages}"
+                  SelectedItem="{Binding ElementName=RootControl, Path=SourceLanguage, Mode=TwoWay}"
+                  DisplayMemberPath="DisplayName"
+                  MinWidth="120"
+                  Height="28"
+                  VerticalAlignment="Center"
+                  Margin="0,0,16,0">
+            <ComboBox.ItemContainerStyle>
+                <Style TargetType="ComboBoxItem">
+                    <Setter Property="FlowDirection" 
+                            Value="{Binding Converter={StaticResource LangToFlowConverter}}"/>
+                </Style>
+            </ComboBox.ItemContainerStyle>
+        </ComboBox>
+        
+        <!-- 目标语言标签 -->
+        <TextBlock Grid.Column="2"
+                   Text="目标语言:"
+                   VerticalAlignment="Center"
+                   Margin="0,0,8,0"
+                   FontSize="12"/>
+        
+        <!-- 目标语言选择器 -->
+        <ComboBox Grid.Column="3"
+                  x:Name="TargetLanguageCombo"
+                  ItemsSource="{Binding ElementName=RootControl, Path=Languages}"
+                  SelectedItem="{Binding ElementName=RootControl, Path=TargetLanguage, Mode=TwoWay}"
+                  DisplayMemberPath="DisplayName"
+                  MinWidth="120"
+                  Height="28"
+                  VerticalAlignment="Center">
+            <ComboBox.ItemContainerStyle>
+                <Style TargetType="ComboBoxItem">
+                    <Setter Property="FlowDirection" 
+                            Value="{Binding Converter={StaticResource LangToFlowConverter}}"/>
+                </Style>
+            </ComboBox.ItemContainerStyle>
+        </ComboBox>
+    </Grid>
+</UserControl>

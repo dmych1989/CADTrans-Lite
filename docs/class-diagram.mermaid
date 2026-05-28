@@ -1,0 +1,153 @@
+classDiagram
+    direction LR
+
+    class EntityType {
+        <<enumeration>>
+        Text
+        MText
+        Attribute
+        TableCell
+        MLeader
+    }
+
+    class TranslationItem {
+        +string Handle
+        +EntityType EntityType
+        +string RawOriginalText
+        +string OriginalText
+        +string? TranslatedText
+        +Dictionary~string,string~ FormatPlaceholders
+        +string LayerName
+        +int ExcelRowIndex
+        +List~string~? CadHandles
+        +string IdString
+        +List~TranslationItem~ MergedItems
+        +bool IsMerged
+        +string? BlockName
+        +string? AttributeTag
+        +int TableRow
+        +int TableColumn
+        +string? FilterReason
+        +string? CleanedText
+        +string? Status
+        +string? Remark
+    }
+
+    class ImportSettings {
+        +bool ImportProxyObjects
+        +bool ImportBlockAttributes
+        +bool ImportDimensionText
+        +bool ImportMTextParagraph
+        +bool ImportMTextWhole
+        +bool ImportFrozenLayers
+        +bool ImportLockedLayers
+        +bool ImportOffLayers
+        +DxfTextCleanerConfig CleanerConfig
+        +bool EnableTextCleaning
+        +bool ImportAcadTables
+        +bool ImportMultiLeaders
+    }
+
+    class AcadTableData {
+        +string Handle
+        +string LayerName
+        +int Rows
+        +int Columns
+        +List~TableCellData~ Cells
+    }
+
+    class TableCellData {
+        +int Row
+        +int Column
+        +int CellType
+        +string Text
+    }
+
+    class MultiLeaderData {
+        +string Handle
+        +string LayerName
+        +int ContentType
+        +string TextContent
+        +string TextStyleHandle
+        +double TextBoundaryWidth
+    }
+
+    class DxfRawParser {
+        +ParseAcadTables(filePath) List~AcadTableData~
+        +ParseMultiLeaders(filePath) List~MultiLeaderData~
+        -ReadCodeValuePairs(lines, startIdx) List~CodePair~
+        -ParseAcadTableSubclass(pairs) AcadTableData
+        -ParseMultiLeaderContext(pairs) MultiLeaderData
+        -DetectDxfVersion(lines) string
+        -ExtractTableCells(pairs, nRows, nCols, dxfVersion) List~TableCellData~
+    }
+
+    class DxfTextReplacer {
+        +Replace(dxfFilePath, replacements)$ (int, int, List~string~)
+        -ReplaceTableCellText(lines, handle, row, col, newText) bool
+        -ReplaceMLeaderText(lines, handle, newText) bool
+        -UpdateTextStyleName(lines, position, newStyleName) void
+        -UpdateTextStyleHandle(lines, position, newHandle) void
+    }
+
+    class DwgExtractor {
+        -ImportSettings _importSettings
+        +ApplySettings(settings) void
+        +ExtractAndMerge(filePath, progress) (List~TranslationItem~, int)
+        +Extract(filePath, progress) List~TranslationItem~
+        -IsLayerVisible(layer) bool
+        -SplitByParagraphs(mtextValue) List~string~
+    }
+
+    class DwgWriter {
+        +WriteBack(sourceFilePath, mergedItems, progress, suffix) (string, List~string~)
+        -CloneItem(src) TranslationItem
+        -TruncateLog(text, maxLen) string
+    }
+
+    class MTextCodec {
+        +StripFormatCodes(rawValue, placeholders)$ string
+        +RestoreFormatCodes(translatedText, placeholders)$ string
+        +StripForTranslation(rawValue)$ string
+    }
+
+    class DxfStyleManager {
+        +EnsureUnicodeStyle(doc, text, existingStyleName)$ string
+        +DetectScript(text)$ string
+        +EncodeDxfUnicode(text)$ string
+    }
+
+    class DxfTextCleaner {
+        +Clean(text, config)$ (string, bool, string?)
+        +IsNumber(text)$ bool
+        +IsCode(text)$ bool
+        +IsSymbol(text)$ bool
+    }
+
+    class ExcelHandler {
+        +Export(items, outputPath) void
+        +Import(excelPath, originalItems) (List~TranslationItem~, string?)
+    }
+
+    class TranslationMerger {
+        +Merge(rawItems)$ List~TranslationItem~
+    }
+
+    TranslationItem --> EntityType : EntityType
+    DwgExtractor --> ImportSettings : uses
+    DwgExtractor --> DxfRawParser : calls
+    DwgExtractor --> MTextCodec : calls
+    DwgExtractor --> DxfTextCleaner : calls
+    DwgExtractor --> TranslationMerger : calls
+    DwgExtractor ..> TranslationItem : creates
+    DwgExtractor ..> AcadTableData : reads
+    DwgExtractor ..> MultiLeaderData : reads
+    DwgWriter --> DxfTextReplacer : calls
+    DwgWriter --> MTextCodec : calls
+    DwgWriter --> DxfStyleManager : calls
+    DwgWriter ..> TranslationItem : processes
+    DxfRawParser ..> AcadTableData : creates
+    DxfRawParser ..> MultiLeaderData : creates
+    DxfRawParser ..> TableCellData : creates
+    ExcelHandler ..> TranslationItem : exports/imports
+    AcadTableData *-- TableCellData : contains
