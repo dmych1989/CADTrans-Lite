@@ -1,0 +1,81 @@
+sequenceDiagram
+    participant VM as MainWindowViewModel
+    participant DE as DwgExtractor
+    participant AF as AiTextFilter
+    participant TS as TranslationService
+    participant GM as GlossaryManager
+    participant DW as DwgWriter
+    participant LA as DxfLayoutAdjuster
+    participant ODA as OdaConverter
+    participant RP as DxfRawParser
+
+    Note over VM: Step 1: 提取导出
+    VM->>DE: ExtractAndMerge(dxfFile, settings, progress)
+    DE-->>VM: (mergedItems, rawCount)
+
+    alt EnableAiFilter == true
+        VM->>AF: FilterItemsAsync(items, config, progress, ct)
+        loop 按 BatchSize(50) 分批
+            AF->>AF: BuildFilterPrompt(batchItems, config)
+            AF->>AF: CallAiApiAsync(prompt, config, ct)
+            AF-->>AF: AI response (JSON)
+            AF->>AF: ParseFilterResponse(response, itemCount)
+            loop 每条 AI 判定结果
+                alt decision == "SKIP"
+                    AF->>AF: item.Status = "ai_skipped"
+                    AF->>AF: item.AiFilterDecision = "SKIP"
+                else decision == "KEEP"
+                    AF->>AF: item.AiFilterDecision = "KEEP"
+                end
+            end
+        end
+        AF-->>VM: filteredCount
+    end
+
+    Note over VM: Step 2: 一键翻译
+    VM->>TS: TranslateItemsAsync(keepItems, srcLang, tgtLang, ...)
+    TS->>TS: Batch translate via ITranslationApi
+    TS-->>VM: 翻译完成
+
+    alt EnableGlossary == true
+        VM->>GM: LoadGlossary(glossaryPath)
+        GM-->>VM: glossaryEntries
+        VM->>GM: ApplyGlossary(items, entries, srcLang, tgtLang)
+        loop 每个 TranslationItem with TranslatedText
+            GM->>GM: MatchAndReplace(translatedText, entries, srcLang, tgtLang)
+        end
+        GM-->>VM: replacedCount
+    end
+
+    Note over VM: Step 3: 导入回填
+    VM->>DW: WriteBack(dxfFile, items, progress)
+    DW->>DW: Step 1-6: 原有文本替换流程
+    DW->>DW: ReplaceTextValue / ReplaceMTextValue / etc.
+    DW->>DW: SaveDxfFile(outputPath, lines)
+
+    alt EnableLayoutAdjust == true
+        DW->>LA: AdjustLayout(outputPath, items, progress)
+        LA->>RP: ParseTextEntities(outputPath)
+        RP-->>LA: textEntities
+        LA->>RP: ParseMTextEntities(outputPath)
+        RP-->>LA: mtextEntities
+        loop 每个 TranslationItem with TranslatedText
+            LA->>LA: CalculateVisualWidth(translatedText, fontSize)
+            alt 视觉宽度 > 实体宽度
+                LA->>LA: scaleFactor = max(0.65, entityWidth / visualWidth)
+                LA->>LA: ScaleTextHeight(lines, entityInfo, scaleFactor)
+                LA->>LA: UpdateMtextBoundary(lines, entityInfo, newWidth)
+            end
+        end
+        LA->>LA: File.WriteAllLines(outputPath, lines)
+        LA-->>DW: (adjustedCount, log)
+    end
+
+    DW-->>VM: (translatedDxfPath, log)
+
+    alt 原始文件为 DWG
+        VM->>ODA: DxfToDwgAsync(translatedDxf, outputDir, outputVersion, ct)
+        ODA-->>VM: dwgPath
+    end
+
+    VM->>VM: StatusText = "回填完成"

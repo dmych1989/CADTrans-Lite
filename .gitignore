@@ -1,0 +1,54 @@
+# ── .NET / Visual Studio build output ──
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+.vs/
+
+# ── Logs ──
+log/
+*.log
+src/log/
+
+# ── Downloaded models & bundled runtime ──
+# The shared Python runtime (LibreTranslate + Argos) lives in tools/py and is
+# provisioned locally via tools/setup_engines.ps1. It is NOT committed (several GB).
+tools/py/
+tools/argos/
+argos/
+_packdl/
+_downloads_bak/
+
+# ── Third-party archives (download separately) ──
+*.zip
+
+# ── User working files (samples, outputs, extracted Excel) ──
+*.dxf
+*.dwg
+*.xlsx
+
+# ── Local diagnostic / scratch scripts at repo root ──
+analyze_*.py
+test_*.py
+gen_assets*.py
+compare_mtext_handling.py
+
+# ── Local test / restore helpers ──
+restore*.bat
+restore*.ps1
+demo_logger.bat
+test_app.bat
+
+# ── Misc working files ──
+bug.txt
+excel_comparison.txt
+*.err
+*.out
+build_*.log
+
+# ── IDE / OS ──
+*.user
+*.suo
+Thumbs.db
+Desktop.ini
+.DS_Store

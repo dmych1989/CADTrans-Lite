@@ -1,0 +1,16 @@
+<Application x:Class="CADTransLite.UI.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CADTransLite.UI"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <!-- Register converters so they are available application-wide -->
+        <local:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+        <local:StringToBoolConverter x:Key="StringToBoolConverter" />
+        <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <local:InverseBoolConverter x:Key="InverseBoolConverter" />
+        <local:LanguageInfoToFlowDirectionConverter x:Key="LanguageInfoToFlowDirectionConverter" />
+        <local:StringToBrushConverter x:Key="StringToBrushConverter" />
+        <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
+    </Application.Resources>
+</Application>

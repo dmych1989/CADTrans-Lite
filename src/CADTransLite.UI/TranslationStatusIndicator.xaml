@@ -1,0 +1,50 @@
+<UserControl x:Class="CADTransLite.UI.TranslationStatusIndicator"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blink/2006" 
+             mc:Ignorable="d" 
+             d:DesignHeight="60" d:DesignWidth="300">
+    <UserControl.Resources>
+        <Style x:Key="StatusIndicatorStyle" TargetType="Border">
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+        
+        <Style x:Key="StatusTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+    
+    <StackPanel>
+        <!-- 当前激活的翻译提供商 -->
+        <Border Background="#E3F2FD" Style="{StaticResource StatusIndicatorStyle}">
+            <StackPanel Orientation="Horizontal">
+                <Ellipse Width="10" Height="10" Fill="#4CAF50" Margin="0,0,6,0" VerticalAlignment="Center" />
+                <TextBlock Text="当前翻译方式: " FontWeight="Bold" Style="{StaticResource StatusTextStyle}" />
+                <TextBlock Text="{Binding CurrentTranslationMethodText}" 
+                           Foreground="#1565C0" FontWeight="SemiBold" 
+                           Style="{StaticResource StatusTextStyle}" />
+            </StackPanel>
+        </Border>
+        
+        <!-- 测试状态 -->
+        <Border Background="#F3E5F5" Style="{StaticResource StatusIndicatorStyle}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="API 测试状态: " FontWeight="Bold" Style="{StaticResource StatusTextStyle}" />
+                    <TextBlock Text="{Binding TestResultMessage}" 
+                               Foreground="{Binding TestResultColor}" 
+                               Style="{StaticResource StatusTextStyle}" />
+                </StackPanel>
+                <Button Content="保存所有设置" 
+                        Command="{Binding SaveSettingsCommand}"
+                        Style="{DynamicResource BrowseButtonStyle}"
+                        FontSize="10" Padding="6,3" Margin="0,4,0,0"
+                        ToolTip="保存所有API设置到配置文件" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>
