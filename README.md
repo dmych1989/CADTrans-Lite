@@ -49,6 +49,20 @@ pwsh -File tools\setup_nllb.ps1      # 可选：配置 NLLB 引擎
 
 `deeplx_windows_amd64.exe` 已随仓库提供，构建时由 `deeplx_backup.bin` 校验/恢复，无需额外下载。
 
+### 自定义下载 Argos 翻译模型
+
+`tools/setup_engines.ps1` 会一次性下载一组固定的语言包（约 2 GB）。如果只想按需下载特定语言对，可用 `download_models.ps1`：它基于 Argos 官方包索引动态列出**全部**可用语言对，由你自由选择。
+
+```powershell
+pwsh -File tools\download_models.ps1 -ListOnly                              # 列出全部 100 个语言对
+pwsh -File tools\download_models.ps1                                        # 交互式：列出后输入编号/代码
+pwsh -File tools\download_models.ps1 -Pairs en_zh,zh_en,en_es,es_en         # 指定语言对（from_to，逗号分隔）
+pwsh -File tools\download_models.ps1 -All                                   # 下载全部
+pwsh -File tools\download_models.ps1 -Pairs en_zh -OutputDir D:\models      # 指定输出目录
+```
+
+模型默认下载到 `tools/py/argos_packages`（与 app 的 `ARGOS_PACKAGES_DIR` 一致，离线加载）。已存在的模型会自动跳过。需要先运行 `setup_engines.ps1` 安装 Python 引擎，模型才会被使用。
+
 ## 使用流程
 
 1. **① 提取导出**：加载源 DXF，提取可翻译文本并导出为 Excel（`*_纯翻译.xlsx`）。
@@ -70,6 +84,7 @@ CADTrans-Lite/
 ├─ tools/
 │  ├─ setup_engines.ps1       # 制备本地翻译 Python 运行时
 │  ├─ setup_nllb.ps1          # 配置 NLLB 引擎
+│  ├─ download_models.ps1     # 自定义选择下载 Argos 翻译模型
 │  └─ ai-cad.py               # AI 辅助脚本
 ├─ build.bat / build_local.ps1
 ├─ LICENSE
