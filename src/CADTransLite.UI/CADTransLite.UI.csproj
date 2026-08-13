@@ -1,0 +1,90 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>CADTransLite.UI</RootNamespace>
+    <AssemblyName>CADTransLite.UI</AssemblyName>
+    <ApplicationIcon>Images\app.ico</ApplicationIcon>
+    <EnableNuGetPackageRestore>false</EnableNuGetPackageRestore>
+    <RestorePackages>false</RestorePackages>
+    <DisableImplicitNuGetPackageReference>true</DisableImplicitNuGetPackageReference>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference to core library -->
+    <ProjectReference Include="..\CADTransLite.Core\CADTransLite.Core.csproj" />
+    <!-- CommunityToolkit.Mvvm for AsyncRelayCommand/RelayCommand -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Embedded images -->
+    <Resource Include="Images\**" />
+  </ItemGroup>
+
+  <!-- Keep a backup copy of the DeepLX server embedded as a resource so it can be recovered
+       at build time (if the root exe is deleted) and at runtime (if an antivirus removes it). -->
+  <ItemGroup>
+    <EmbeddedResource Include="deeplx_backup.bin" />
+  </ItemGroup>
+
+  <!-- Build guard: if the source DeepLX exe at the repo root is missing, restore it from the
+       backup file before compiling/copying. This survives accidental deletion and `git clean`. -->
+  <Target Name="RestoreDeepLXExe" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <DeepLXRootExe>$(MSBuildProjectDirectory)\..\..\deeplx_windows_amd64.exe</DeepLXRootExe>
+      <DeepLXBackup>$(MSBuildProjectDirectory)\deeplx_backup.bin</DeepLXBackup>
+    </PropertyGroup>
+    <Message Condition="!Exists('$(DeepLXRootExe)')"
+             Text="[DeepLX] 根目录 deeplx_windows_amd64.exe 缺失，正在从备份恢复…" Importance="high" />
+    <Copy Condition="!Exists('$(DeepLXRootExe)') And Exists('$(DeepLXBackup)')"
+          SourceFiles="$(DeepLXBackup)" DestinationFiles="$(DeepLXRootExe)" />
+    <Error Condition="!Exists('$(DeepLXRootExe)')"
+           Text="[DeepLX] deeplx_windows_amd64.exe 与备份(deeplx_backup.bin)均缺失，无法恢复。请将该文件放到仓库根目录。" />
+  </Target>
+
+  <!-- Copy the (recovered) DeepLX exe into the output directory so it ships with the app. -->
+  <Target Name="CopyDeepLXExe" AfterTargets="RestoreDeepLXExe" DependsOnTargets="RestoreDeepLXExe">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\..\..\deeplx_windows_amd64.exe"
+          DestinationFiles="$(OutDir)deeplx_windows_amd64.exe"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- ── Shared embedded Python runtime (tools/py): LibreTranslate + Argos ─────
+       Copy the bundled Python interpreter + server scripts + language packages from
+       repo_root/tools/py into the output dir when present. Non-fatal: skipped if the folder
+       has not been provisioned via setup_engines.ps1. -->
+  <Target Name="CopyPyRuntime" AfterTargets="Build">
+    <ItemGroup>
+      <PyFiles Include="$(MSBuildProjectDirectory)\..\..\tools\py\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PyFiles)"
+          DestinationFiles="@(PyFiles->'$(OutDir)tools\py\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(PyFiles)' != ''" />
+  </Target>
+
+  <!-- Also ship the embedded Python runtime with the published (self-contained) output.
+       Copy from the already-verified build output $(OutDir)tools\py (populated by CopyPyRuntime
+       above) rather than the raw source tree, so the published copy is byte-identical to the
+       working build output and cannot be re-corrupted by a second publish-pipeline copy. -->
+  <Target Name="CopyPyRuntimePublish" AfterTargets="Publish">
+    <ItemGroup>
+      <PyFilesPublish Include="$(OutDir)tools\py\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PyFilesPublish)"
+          DestinationFiles="@(PyFilesPublish->'$(PublishDir)tools\py\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(PyFilesPublish)' != ''" />
+  </Target>
+
+  <!-- Disable package resolution -->
+  <PropertyGroup>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <GenerateNuGetAudit>false</GenerateNuGetAudit>
+  </PropertyGroup>
+
+</Project>

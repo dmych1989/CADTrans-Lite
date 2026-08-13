@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>CADTransLite.McpBridge</AssemblyName>
+    <RootNamespace>CADTransLite.McpServer</RootNamespace>
+    <AssemblyTitle>CADTrans Lite MCP Bridge</AssemblyTitle>
+    <Description>Headless TCP JSON-RPC bridge exposing the CADTrans Lite translation pipeline to MCP clients.</Description>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CADTransLite.Core\CADTransLite.Core.csproj" />
+  </ItemGroup>
+
+</Project>

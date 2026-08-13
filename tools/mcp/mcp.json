@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "cadtrans": {
+      "command": "python",
+      "args": ["D:/GitHub/CADTrans Lite/tools/mcp/server.py"],
+      "env": {
+        "CADTRANS_BRIDGE_HOST": "127.0.0.1",
+        "CADTRANS_BRIDGE_PORT": "8090",
+        "CADTRANS_BRIDGE_EXE": "D:/GitHub/CADTrans Lite/src/CADTransLite.McpServer/bin/Debug/net9.0-windows/CADTransLite.McpBridge.exe",
+        "CADTRANS_AUTO_ARGOS": "1"
+      }
+    }
+  }
+}

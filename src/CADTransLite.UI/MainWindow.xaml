@@ -1,0 +1,1194 @@
+<Window x:Class="CADTransLite.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CADTransLite.UI"
+        xmlns:status="clr-namespace:CADTransLite.UI"
+        mc:Ignorable="d"
+        Title="CADTrans Lite v3.5"
+        Icon="pack://application:,,,/Images/logo.png"
+        Height="780" Width="760"
+        MinHeight="760" MinWidth="1000"
+        Background="#F1F5F9"
+        Foreground="#0F172A"
+        WindowStartupLocation="CenterScreen"
+        AllowDrop="True"
+        DragEnter="Window_DragEnter"
+        Drop="Window_Drop">
+
+    <Window.DataContext>
+        <local:MainWindowViewModel />
+    </Window.DataContext>
+
+    <Window.Resources>
+        <!-- Cohesive indigo + slate accent palette -->
+        <SolidColorBrush x:Key="AccentBrush" Color="#4F46E5" />
+        <SolidColorBrush x:Key="AccentLightBrush" Color="#6366F1" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="SurfaceVariantBrush" Color="#EEF2FF" />
+        <SolidColorBrush x:Key="OnSurfaceBrush" Color="#0F172A" />
+        <SolidColorBrush x:Key="DisabledBrush" Color="#94A3B8" />
+
+        <!-- Semantic accent colors for engine cards (left accent bar) -->
+        <SolidColorBrush x:Key="EngineDeepL" Color="#6366F1" />
+        <SolidColorBrush x:Key="EngineCustomAI" Color="#8B5CF6" />
+        <SolidColorBrush x:Key="EngineBaidu" Color="#0EA5E9" />
+        <SolidColorBrush x:Key="EngineTencent" Color="#EF4444" />
+        <SolidColorBrush x:Key="EngineMicrosoft" Color="#3B82F6" />
+        <SolidColorBrush x:Key="EngineDeepLX" Color="#EC4899" />
+        <SolidColorBrush x:Key="EngineLibre" Color="#10B981" />
+        <SolidColorBrush x:Key="EngineArgos" Color="#F59E0B" />
+        <SolidColorBrush x:Key="EngineNllb" Color="#14B8A6" />
+
+        <!-- Flat primary button style -->
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#4F46E5" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#6366F1" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background" Value="#BDBDBD" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#4338CA" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="StepButtonStyle" TargetType="Button"
+               BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="#4F46E5" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#6366F1" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#E2E8F0" />
+                    <Setter Property="Foreground" Value="#64748B" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#4338CA" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- MCP 一键翻译按钮（绿色） -->
+        <Style x:Key="McpButtonStyle" TargetType="Button" BasedOn="{StaticResource StepButtonStyle}">
+            <Setter Property="Background" Value="#059669" />
+            <Setter Property="Padding" Value="8,9" />
+            <Setter Property="MinHeight" Value="46" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#388E3C" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#047857" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ODA Download button (orange) -->
+        <Style x:Key="OdaDownloadButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#F59E0B" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="9,3" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#F57C00" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#B45309" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Browse button (gray) -->
+        <Style x:Key="BrowseButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#607D8B" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#455A64" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background" Value="#BDBDBD" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Section header style -->
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#4F46E5" />
+            <Setter Property="Margin" Value="0,2,0,4" />
+        </Style>
+
+        <!-- Setting label style -->
+        <Style x:Key="SettingLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="#334155" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,1" />
+        </Style>
+
+        <!-- Compact settings styles (tighten 自定义设置 area) -->
+        <Style x:Key="SettingRowStyle" TargetType="Grid">
+            <Setter Property="Margin" Value="0,1,0,1" />
+        </Style>
+
+        <Style x:Key="CardBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="#F8FAFC" />
+            <Setter Property="BorderBrush" Value="#E2E8F0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Margin" Value="0,5,0,0" />
+        </Style>
+
+        <!-- Unified engine settings card: consistent light surface + colored left accent bar -->
+        <Style x:Key="EngineCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="#F8FAFC" />
+            <Setter Property="BorderBrush" Value="#E2E8F0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Margin" Value="0,5,0,0" />
+        </Style>
+
+        <Style x:Key="SettingCheckStyle" TargetType="CheckBox">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Margin" Value="0,1,14,1" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="SettingTextBoxStyle" TargetType="TextBox">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="4,2" />
+            <Setter Property="MinHeight" Value="22" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ================================================================
+             Main content area
+             ================================================================ -->
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="32,24,32,16">
+
+                <!-- ──────────────────────────────────────────────────────────
+                     Title
+                     ────────────────────────────────────────────────────────── -->
+                <TextBlock Text="CADTrans Lite v3.5"
+                           FontSize="20" FontWeight="Bold"
+                           Foreground="#4F46E5" Margin="0,0,0,4" />
+                <TextBlock Text="DWG/DXF 文字提取  ›  翻译  ›  回填输出"
+                           FontSize="12" Foreground="#64748B" Margin="0,0,0,4" />
+
+                <!-- ──────────────────────────────────────────────────────────
+                     ODA File Converter Status & Path
+                     ────────────────────────────────────────────────────────── -->
+                <Border Background="#F8FAFC"
+                        BorderBrush="#E2E8F0"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="10,7"
+                        Margin="0,0,0,12">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Status indicator dot -->
+                            <Ellipse Grid.Column="0"
+                                     Width="10" Height="10"
+                                     Margin="0,0,10,0"
+                                     VerticalAlignment="Center">
+                                <Ellipse.Fill>
+                                    <Binding Path="OdaStatusColor"
+                                             Converter="{x:Static local:StringToBrushConverter.Instance}" />
+                                </Ellipse.Fill>
+                            </Ellipse>
+
+                            <!-- Status text -->
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding OdaStatusText}"
+                                       FontSize="11"
+                                       Foreground="#475569"
+                                       VerticalAlignment="Center"
+                                       TextWrapping="Wrap" />
+
+                            <!-- Download button -->
+                            <Button Grid.Column="2"
+                                    Content="下载 ODA"
+                                    Style="{DynamicResource OdaDownloadButtonStyle}"
+                                    Command="{Binding OpenOdaDownloadCommand}"
+                                    ToolTip="打开 ODA 官网下载页面"
+                                    Margin="12,0,0,0"
+                                    Visibility="{Binding IsOdaAvailable,
+                                        Converter={x:Static local:InverseBoolToVisibilityConverter.Instance}}" />
+
+                            <!-- Download button (when available, show Update/Change) -->
+                            <Button Grid.Column="2"
+                                    Content="更换"
+                                    Style="{DynamicResource OdaDownloadButtonStyle}"
+                                    Command="{Binding OpenOdaDownloadCommand}"
+                                    ToolTip="更改 ODA File Converter 路径"
+                                    Margin="12,0,0,0"
+                                    Visibility="{Binding IsOdaAvailable,
+                                        Converter={x:Static local:InverseBoolToVisibilityConverter.Instance}}" />
+                        </Grid>
+
+                        <!-- Custom ODA path -->
+                        <Grid Margin="20,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                       Text="ODA路径:"
+                                       Style="{DynamicResource SettingLabelStyle}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0" />
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding OdaPath, UpdateSourceTrigger=PropertyChanged}"
+                                     FontSize="11"
+                                     Padding="6,4"
+                                     VerticalAlignment="Center"
+                                     ToolTip="ODA File Converter 可执行文件路径" />
+                            <Button Grid.Column="2"
+                                    Content="浏览"
+                                    Style="{DynamicResource BrowseButtonStyle}"
+                                    Command="{Binding BrowseOdaPathCommand}"
+                                    Margin="8,0,0,0"
+                                    Padding="10,4"
+                                    ToolTip="浏览 ODA File Converter 路径" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ──────────────────────────────────────────────────────────
+                     Drop Zone
+                     ────────────────────────────────────────────────────────── -->
+                <Border Background="White"
+                        BorderBrush="#90CAF9"
+                        BorderThickness="2"
+                        CornerRadius="8"
+                        MinHeight="80"
+                        Margin="0,0,0,16"
+                        Cursor="Hand"
+                        MouseLeftButtonUp="DropZone_Click">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentFilePath, Converter={x:Static local:StringToBoolConverter.Instance}}" Value="True">
+                                    <Setter Property="Background" Value="#EEF2FF" />
+                                    <Setter Property="BorderBrush" Value="#4F46E5" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Margin="16">
+                        <TextBlock Text="📂"
+                                   FontSize="28"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,3" />
+                        <TextBlock HorizontalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="#546E7A"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap">
+                            <Run Text="拖入 .dwg / .dxf 文件到此处，或" />
+                            <Run Text="点击选择文件" Foreground="#4F46E5" FontWeight="SemiBold" />
+                        </TextBlock>
+                        <TextBlock Text="{Binding CurrentFilePath}"
+                                   FontSize="10"
+                                   Foreground="#4F46E5"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   Margin="0,6,0,0"
+                                   MaxWidth="500"
+                                   Visibility="{Binding CurrentFilePath,
+                                       Converter={x:Static local:StringToVisibilityConverter.Instance}}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ──────────────────────────────────────────────────────────
+                     Language Selection
+                     ────────────────────────────────────────────────────────── -->
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="24" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="源语言:"
+                               FontSize="12" Foreground="#334155"
+                               VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding SourceLanguages}"
+                              SelectedItem="{Binding SourceLanguage}"
+                              DisplayMemberPath="DisplayName"
+                              FontSize="11" Padding="5,3" />
+
+                    <TextBlock Grid.Column="3" Text="目标语言:"
+                               FontSize="12" Foreground="#334155"
+                               VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ComboBox Grid.Column="4"
+                              ItemsSource="{Binding TargetLanguages}"
+                              SelectedItem="{Binding TargetLanguage}"
+                              DisplayMemberPath="DisplayName"
+                              FontSize="11" Padding="5,3" />
+
+                    <TextBlock Grid.Column="5" Text="翻译引擎:"
+                               FontSize="12" Foreground="#334155"
+                               VerticalAlignment="Center" Margin="12,0,8,0" />
+                    <ComboBox Grid.Column="6"
+                              ItemsSource="{Binding TranslationProviders}"
+                              SelectedItem="{Binding SelectedProvider}"
+                              FontSize="11" Padding="5,3" />
+                </Grid>
+
+                <!-- Channel model/backend hint: updates with the selected engine -->
+                <TextBlock Text="{Binding SupportedModelsText}"
+                           FontSize="11" Foreground="#607D8B" Margin="0,0,0,12"
+                           TextWrapping="Wrap" />
+
+                <!-- ──────────────────────────────────────────────────────────
+                     翻译 API 设置（选中引擎后在此填写对应配置）
+                     ────────────────────────────────────────────────────────── -->
+                <Border Background="White"
+                        BorderBrush="#E2E8F0"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="12,10"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="🔌 翻译 API 设置"
+                                   FontSize="13" FontWeight="Bold"
+                                   Foreground="#4F46E5"
+                                   Margin="0,0,0,2" />
+                        <TextBlock Text="在上方选择翻译引擎后，下方显示对应的 API 配置"
+                                   FontSize="10.5" Foreground="#64748B"
+                                   Margin="0,0,0,8" TextWrapping="Wrap" />
+
+                        <!-- 引擎卡片（每次仅显示选中引擎） -->
+                        <StackPanel>
+                            <Border Style="{DynamicResource EngineCardStyle}" BorderThickness="4,1,1,1" BorderBrush="{DynamicResource EngineDeepL}" Visibility="{Binding DeepLSettingsVisibility}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="API Key:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" />
+                                        <TextBox Grid.Column="1" Text="{Binding DeepLApiKey, UpdateSourceTrigger=PropertyChanged, Delay=300}" FontSize="11" Padding="5,3" Margin="6,0,6,0" FontFamily="Consolas" ToolTip="DeepL API 密钥（Free版后缀 :fx）" />
+                                        <Button Grid.Column="2" Content="测试" Command="{Binding TestTranslationApiCommand}" CommandParameter="DeepL" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" ToolTip="测试 DeepL API 连接" />
+                                    </Grid>
+                                    <TextBlock Margin="0,4,0,0" FontSize="10" Foreground="#475569">
+                                        <Run Text="申请地址: " />
+                                        <Hyperlink NavigateUri="https://www.deepl.com/pro-api" RequestNavigate="Hyperlink_RequestNavigate">https://www.deepl.com/pro-api</Hyperlink>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{DynamicResource EngineCardStyle}" BorderThickness="4,1,1,1" BorderBrush="{DynamicResource EngineCustomAI}" Visibility="{Binding CustomAISettingsVisibility}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="接口预设:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding CustomAiPresets}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedCustomAiPreset}" FontSize="11" Padding="5,3" Margin="0,1" ToolTip="选择常用服务商，自动填充 Base URL 与默认模型" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="API Key:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged, Delay=300}" FontSize="11" Padding="5,3" Margin="0,1" FontFamily="Consolas" ToolTip="AI模型的API密钥" />
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Base URL:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}" FontSize="11" Padding="5,3" Margin="0,1" ToolTip="API服务地址（自动拼接 /chat/completions），如 https://api.openai.com/v1" />
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="模型名称:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <Grid Grid.Row="3" Grid.Column="1" Margin="0,1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox Grid.Column="0" ItemsSource="{Binding ModelNames}" Text="{Binding ModelName, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" FontSize="11" Padding="5,3" Margin="0,0,6,0" ToolTip="模型名称，可手填，也可点击「获取模型列表」拉取" />
+                                            <Button Grid.Column="1" Content="获取模型列表" Command="{Binding FetchModelsCommand}" IsEnabled="{Binding EnableCustomAI}" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" ToolTip="从 Base URL 的 /models 接口获取可用模型" />
+                                        </Grid>
+                                    </Grid>
+                                    <Button Content="测试" Command="{Binding TestTranslationApiCommand}" CommandParameter="CustomAI" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" Margin="6,6,0,0" HorizontalAlignment="Right" ToolTip="测试自定义AI模型连接" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{DynamicResource EngineCardStyle}" BorderThickness="4,1,1,1" BorderBrush="{DynamicResource EngineBaidu}" Visibility="{Binding BaiduSettingsVisibility}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="App ID:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding BaiduAppId, UpdateSourceTrigger=PropertyChanged}" FontSize="11" Padding="5,3" Margin="0,1" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="App Key:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <Grid Grid.Row="1" Grid.Column="1" Margin="0,1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0" Text="{Binding BaiduAppKey, UpdateSourceTrigger=PropertyChanged, Delay=300}" FontSize="11" Padding="5,3" FontFamily="Consolas" />
+                                            <Button Grid.Column="1" Content="测试" Command="{Binding TestTranslationApiCommand}" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" Margin="6,0,0,0" ToolTip="测试百度翻译API连接" />
+                                        </Grid>
+                                    </Grid>
+                                    <TextBlock Margin="0,4,0,0" FontSize="10" Foreground="#475569">
+                                        <Run Text="申请地址: " />
+                                        <Hyperlink NavigateUri="https://fanyi-api.baidu.com/" RequestNavigate="Hyperlink_RequestNavigate">https://fanyi-api.baidu.com/</Hyperlink>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{DynamicResource EngineCardStyle}" BorderThickness="4,1,1,1" BorderBrush="{DynamicResource EngineTencent}" Visibility="{Binding TencentSettingsVisibility}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="SecretId:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding TencentSecretId, UpdateSourceTrigger=PropertyChanged}" FontSize="11" Padding="5,3" Margin="0,1" FontFamily="Consolas" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="SecretKey:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <Grid Grid.Row="1" Grid.Column="1" Margin="0,1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0" Text="{Binding TencentSecretKey, UpdateSourceTrigger=PropertyChanged, Delay=300}" FontSize="11" Padding="5,3" FontFamily="Consolas" />
+                                            <Button Grid.Column="1" Content="测试" Command="{Binding TestTranslationApiCommand}" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" Margin="6,0,0,0" ToolTip="测试腾讯翻译API连接" />
+                                        </Grid>
+                                    </Grid>
+                                    <TextBlock Margin="0,4,0,0" FontSize="10" Foreground="#475569">
+                                        <Run Text="申请地址: " />
+                                        <Hyperlink NavigateUri="https://cloud.tencent.com/product/tmt" RequestNavigate="Hyperlink_RequestNavigate">腾讯云机器翻译</Hyperlink>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{DynamicResource EngineCardStyle}" BorderThickness="4,1,1,1" BorderBrush="{DynamicResource EngineMicrosoft}" Visibility="{Binding MicrosoftSettingsVisibility}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="API Key:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MicrosoftApiKey, UpdateSourceTrigger=PropertyChanged, Delay=300}" FontSize="11" Padding="5,3" Margin="0,1" FontFamily="Consolas" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="区域:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <Grid Grid.Row="1" Grid.Column="1" Margin="0,1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0" Text="{Binding MicrosoftRegion, UpdateSourceTrigger=PropertyChanged}" FontSize="11" Padding="5,3" ToolTip="Azure 区域，如 global、eastasia" />
+                                            <Button Grid.Column="1" Content="测试" Command="{Binding TestTranslationApiCommand}" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" Margin="6,0,0,0" ToolTip="测试 Microsoft 翻译连接" />
+                                        </Grid>
+                                    </Grid>
+                                    <TextBlock Margin="0,4,0,0" FontSize="10" Foreground="#475569">
+                                        <Run Text="申请地址: " />
+                                        <Hyperlink NavigateUri="https://azure.microsoft.com/services/cognitive-services/translator/" RequestNavigate="Hyperlink_RequestNavigate">Azure Translator</Hyperlink>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{DynamicResource EngineCardStyle}" BorderThickness="4,1,1,1" BorderBrush="{DynamicResource EngineDeepLX}" Visibility="{Binding DeepLXSettingsVisibility}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="API 地址:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" />
+                                        <TextBox Grid.Column="1" Text="{Binding DeepLXUrl, UpdateSourceTrigger=PropertyChanged}" FontSize="11" Padding="5,3" Margin="6,0,6,0" ToolTip="DeepLX 本地服务地址" />
+                                        <Button Grid.Column="2" Content="测试" Command="{Binding TestTranslationApiCommand}" CommandParameter="DeepLX" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" ToolTip="测试 DeepLX 本地翻译连接" />
+                                    </Grid>
+                                    <TextBlock Text="提示: 需先启动 DeepLX 本地服务，默认地址 http://127.0.0.1:1188" FontSize="10" Foreground="#475569" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{DynamicResource EngineCardStyle}" BorderThickness="4,1,1,1" BorderBrush="{DynamicResource EngineLibre}" Visibility="{Binding LibreTranslateSettingsVisibility}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="API 地址:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" />
+                                        <TextBox Grid.Column="1" Text="{Binding LibreTranslateUrl, UpdateSourceTrigger=PropertyChanged}" FontSize="11" Padding="5,3" Margin="6,0,6,0" ToolTip="LibreTranslate 本地服务地址" />
+                                        <Button Grid.Column="2" Content="测试" Command="{Binding TestTranslationApiCommand}" CommandParameter="LibreTranslate (本地)" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" ToolTip="测试 LibreTranslate 本地翻译连接" />
+                                    </Grid>
+                                    <Grid Margin="0,6,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Ellipse Width="9" Height="9" Fill="{Binding LibreTranslateService.StatusBrush}" Margin="0,0,6,0" />
+                                            <TextBlock Text="{Binding LibreTranslateService.StatusText}" FontSize="11" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                            <Button Content="关闭服务" Command="{Binding PauseLocalServiceCommand}" CommandParameter="LibreTranslate (本地)" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" Margin="6,0,0,0" ToolTip="停止 LibreTranslate 本地服务，释放端口与内存" />
+                                            <Button Content="启动服务" Command="{Binding StartLocalServiceCommand}" CommandParameter="LibreTranslate (本地)" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" Margin="6,0,0,0" ToolTip="启动 LibreTranslate 本地 Python 翻译服务并预热语言模型" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="提示: 开源本地翻译，默认地址 http://127.0.0.1:5000；软件启动时会自动以嵌入式 Python 拉起 libretranslate 服务" FontSize="10" Foreground="#475569" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{DynamicResource EngineCardStyle}" BorderThickness="4,1,1,1" BorderBrush="{DynamicResource EngineArgos}" Visibility="{Binding ArgosSettingsVisibility}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="API 地址:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" />
+                                        <TextBox Grid.Column="1" Text="{Binding ArgosUrl, UpdateSourceTrigger=PropertyChanged}" FontSize="11" Padding="5,3" Margin="6,0,6,0" ToolTip="Argos Translate 本地服务地址" />
+                                        <Button Grid.Column="2" Content="测试" Command="{Binding TestTranslationApiCommand}" CommandParameter="Argos Translate (本地)" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" ToolTip="测试 Argos Translate 本地翻译连接" />
+                                    </Grid>
+                                    <Grid Margin="0,6,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Ellipse Width="9" Height="9" Fill="{Binding ArgosService.StatusBrush}" Margin="0,0,6,0" />
+                                            <TextBlock Text="{Binding ArgosService.StatusText}" FontSize="11" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                            <Button Content="关闭服务" Command="{Binding PauseLocalServiceCommand}" CommandParameter="Argos Translate (本地)" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" Margin="6,0,0,0" ToolTip="停止 Argos Translate 本地服务，释放端口与内存" />
+                                            <Button Content="启动服务" Command="{Binding StartLocalServiceCommand}" CommandParameter="Argos Translate (本地)" Style="{DynamicResource BrowseButtonStyle}" Padding="10,4" Margin="6,0,0,0" ToolTip="启动或重启 Argos Translate 本地服务（会先清理占用端口的旧实例）" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="提示: 开源 Python 本地翻译；默认地址 http://127.0.0.1:5001；需先运行 setup_engines.ps1 安装语言包" FontSize="10" Foreground="#475569" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{DynamicResource EngineCardStyle}"
+                                    BorderThickness="4,1,1,1"
+                                    BorderBrush="{DynamicResource EngineNllb}"
+                                    Visibility="{Binding NllbSettingsVisibility}">
+                                <StackPanel>
+                                    <CheckBox Content="启用 NLLB (本地离线) 翻译引擎"
+                                              IsChecked="{Binding EnableNllb, Mode=TwoWay}"
+                                              Style="{DynamicResource SettingCheckStyle}"
+                                              ToolTip="基于 Meta NLLB-200-Distilled-600M 的离线神经机器翻译，无需联网、隐私安全（集成自 RTranslator）" />
+                                    <Grid Margin="24,6,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="服务地址:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        <TextBox Grid.Column="1" Text="{Binding NllbUrl, UpdateSourceTrigger=PropertyChanged}" Style="{DynamicResource SettingTextBoxStyle}" Margin="0,2" />
+                                        <Button Grid.Column="2" Content="测试" Command="{Binding TestTranslationApiCommand}" CommandParameter="NLLB (本地)" Style="{DynamicResource BrowseButtonStyle}" Margin="8,0,0,0" Padding="10,6" ToolTip="测试 NLLB 本地离线翻译连接" />
+                                    </Grid>
+
+                                    <Grid Margin="16,4,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Ellipse Width="10" Height="10"
+                                                     Fill="{Binding NllbService.StatusBrush}"
+                                                     Margin="0,0,6,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding NllbService.StatusText}"
+                                                       FontSize="11" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                            <Button Content="关闭服务"
+                                                    Command="{Binding PauseLocalServiceCommand}"
+                                                    CommandParameter="NLLB (本地)"
+                                                    Style="{DynamicResource BrowseButtonStyle}"
+                                                    Padding="10,6"
+                                                    Margin="0,0,6,0"
+                                                    ToolTip="停止 NLLB 本地离线翻译服务，释放端口与内存" />
+                                            <Button Content="启动服务"
+                                                    Command="{Binding StartLocalServiceCommand}"
+                                                    CommandParameter="NLLB (本地)"
+                                                    Style="{DynamicResource BrowseButtonStyle}"
+                                                    Padding="10,6"
+                                                    ToolTip="启动 NLLB 本地离线翻译服务并预热模型（首次载入 600M 模型约需 1–3 分钟，请勿重复点击；状态变绿即可翻译）" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TextBlock Text="提示: 离线 NLLB 神经翻译（RTranslator 同款模型）；默认地址 http://127.0.0.1:5002；首次使用会下载/加载约 600M 模型，请耐心等待。需先运行 setup_nllb.ps1 安装依赖"
+                                               FontSize="10" Foreground="#475569" Margin="24,4,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Translation Status Indicator -->
+                        <status:TranslationStatusIndicator Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ──────────────────────────────────────────────────────────
+                     自定义设置（导入 / 输出 / 高级）
+                     ────────────────────────────────────────────────────────── -->
+                <GroupBox Header="🔧 自定义设置" Margin="0,0,0,6">
+                    <Border Background="White"
+                            BorderBrush="#E2E8F0"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="10,8"
+                            Margin="0,2,0,0">
+
+                        <StackPanel>
+                        <!-- ① 导入与提取  |  ② 输出与回填 （两列） -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- 左列：导入与提取 -->
+                            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                <TextBlock Text="① 导入与提取设置"
+                                           FontWeight="Bold" FontSize="12"
+                                           Foreground="#4F46E5"
+                                           Margin="0,0,0,4" />
+
+                                <TextBlock Text="提取元素类型:" FontWeight="Bold" FontSize="11" Margin="0,4,0,3" />
+                                <WrapPanel>
+                                    <CheckBox Content="代理对象(自动炸开)" IsChecked="{Binding ImportProxyObjects}" Margin="0,1,14,1" FontSize="11" />
+                                    <CheckBox Content="块属性标记" IsChecked="{Binding ImportBlockAttributes}" Margin="0,1,14,1" FontSize="11" />
+                                    <CheckBox Content="提示和值" IsChecked="{Binding ImportDimensionText}" Margin="0,1,14,1" FontSize="11" />
+                                </WrapPanel>
+
+                                <TextBlock Text="多行文本处理:" FontWeight="Bold" FontSize="11" Margin="0,8,0,3" />
+                                <StackPanel>
+                                    <RadioButton Content="按段落提取 (推荐)" IsChecked="{Binding ImportMTextParagraph}" GroupName="MTextMode" Margin="0,1,0,1" FontSize="11" />
+                                    <RadioButton Content="作为整体提取" IsChecked="{Binding ImportMTextWhole}" GroupName="MTextMode" Margin="0,1,0,1" FontSize="11" />
+                                </StackPanel>
+
+                                <TextBlock Text="特殊图层处理:" FontWeight="Bold" FontSize="11" Margin="0,8,0,3" />
+                                <WrapPanel>
+                                    <CheckBox Content="冻结图层" IsChecked="{Binding ImportFrozenLayers}" Margin="0,1,14,1" FontSize="11" ToolTip="启用后将提取冻结图层中的文字" />
+                                    <CheckBox Content="锁定图层" IsChecked="{Binding ImportLockedLayers}" Margin="0,1,14,1" FontSize="11" ToolTip="启用后将提取锁定图层中的文字" />
+                                    <CheckBox Content="关闭图层" IsChecked="{Binding ImportOffLayers}" Margin="0,1,14,1" FontSize="11" ToolTip="启用后将提取关闭图层中的文字" />
+                                </WrapPanel>
+
+                                <TextBlock Text="导出与去重:" FontWeight="Bold" FontSize="11" Margin="0,8,0,3" />
+                                <WrapPanel>
+                                    <CheckBox Content="多列Excel格式 (11列)" IsChecked="{Binding UseRichExcelFormat}" Margin="0,1,14,1" FontSize="11" ToolTip="启用后导出11列富元数据格式（Handle/类型/图层/原文/清洗/译文/状态等）；关闭则使用传统2列格式" />
+                                    <CheckBox Content="清洗后去重" IsChecked="{Binding EnableCleanedDedup}" Margin="0,1,14,1" FontSize="11" ToolTip="启用后，合并阶段会按 (类型+清洗文本) 进行二次去重，减少翻译行数" />
+                                </WrapPanel>
+                            </StackPanel>
+
+                            <!-- 右列：输出与回填 -->
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="② 输出与回填设置"
+                                           FontWeight="Bold" FontSize="12"
+                                           Foreground="#4F46E5"
+                                           Margin="0,0,0,4" />
+
+                                <TextBlock Text="回填与输出:" FontWeight="Bold" FontSize="11" Margin="0,4,0,3" />
+                                <CheckBox Content="启用布局自适应（文字过长自动缩放）" IsChecked="{Binding EnableLayoutAdjust}" Margin="0,1" FontSize="11" ToolTip="启用后，当译文比原文长导致文字溢出实体边界时，自动缩放字高使其适应" />
+                                <CheckBox Content="启用术语表替换" IsChecked="{Binding EnableGlossary}" Margin="0,1" FontSize="11" ToolTip="启用术语表后，翻译完成时自动应用术语替换" />
+                                <CheckBox Content="启用 AI 智能过滤" IsChecked="{Binding EnableAiFilter}" Margin="0,1" FontSize="11" ToolTip="启用后，翻译前自动用 AI 判断哪些文本不需要翻译" />
+                                <Grid Margin="0,2,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="DWG 版本：" FontSize="11" Foreground="#334155" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding OutputVersions}" SelectedItem="{Binding SelectedOutputVersion}" DisplayMemberPath="DisplayName" FontSize="11" Padding="5,3" ToolTip="选择输出的 DWG 文件版本（需要 ODA File Converter）" />
+                                </Grid>
+
+                                <TextBlock Text="导出文件后缀:" FontWeight="Bold" FontSize="11" Margin="0,12,0,3" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding ExportSuffix, UpdateSourceTrigger=PropertyChanged}"
+                                             FontSize="11" Padding="5,3"
+                                             MaxLength="50" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Margin="8,0,0,0" VerticalAlignment="Center"
+                                               FontSize="10" Foreground="Gray">
+                                        <Run Text="示例: " /><Run Text="{Binding CurrentFilePath, TargetNullValue='file.dxf'}" FontWeight="Bold" FontSize="9" /><Run Text="{Binding ExportSuffix}" Foreground="#4F46E5" />
+                                    </TextBlock>
+                                </Grid>
+                                <TextBlock Text="后缀将添加到输出文件名中，用于区分原文件和翻译文件"
+                                           FontSize="10" Foreground="Gray" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- ③ 高级设置：术语表管理 / AI 过滤配置（启用时显示） -->
+                        <StackPanel Margin="0,12,0,0">
+                            <TextBlock Text="③ 高级设置"
+                                       FontWeight="Bold" FontSize="12"
+                                       Foreground="#4F46E5"
+                                       Margin="0,0,0,4" />
+
+                            <!-- Glossary management -->
+                            <StackPanel Margin="0,4,0,0" Visibility="{Binding EnableGlossary, Converter={x:Static local:BoolToVisibilityConverter.Instance}}">
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding GlossaryPath, UpdateSourceTrigger=PropertyChanged}"
+                                             FontSize="11" Padding="4,2"
+                                             ToolTip="术语表 JSON 文件路径" />
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="4,0,0,0">
+                                        <Button Content="浏览" Command="{Binding BrowseGlossaryPathCommand}"
+                                                Style="{DynamicResource BrowseButtonStyle}"
+                                                FontSize="10" Padding="8,2" Margin="2,0" />
+                                        <Button Content="加载" Command="{Binding LoadGlossaryCommand}"
+                                                Style="{DynamicResource BrowseButtonStyle}"
+                                                FontSize="10" Padding="8,2" Margin="2,0" />
+                                        <Button Content="保存" Command="{Binding SaveGlossaryCommand}"
+                                                Style="{DynamicResource BrowseButtonStyle}"
+                                                FontSize="10" Padding="8,2" Margin="2,0" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <DataGrid ItemsSource="{Binding GlossaryEntries}"
+                                          AutoGenerateColumns="False"
+                                          CanUserAddRows="True"
+                                          CanUserDeleteRows="True"
+                                          MaxHeight="200"
+                                          FontSize="11"
+                                          HeadersVisibility="Column"
+                                          GridLinesVisibility="Horizontal"
+                                          BorderThickness="1"
+                                          BorderBrush="#E2E8F0"
+                                          Margin="0,2,0,0">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="源术语" Binding="{Binding SourceTerm, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                                        <DataGridTextColumn Header="目标术语" Binding="{Binding TargetTerm, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                                        <DataGridTextColumn Header="源语言" Binding="{Binding SourceLang, UpdateSourceTrigger=PropertyChanged}" Width="50" />
+                                        <DataGridTextColumn Header="目标语言" Binding="{Binding TargetLang, UpdateSourceTrigger=PropertyChanged}" Width="50" />
+                                        <DataGridCheckBoxColumn Header="区分大小写" Binding="{Binding IsCaseSensitive}" Width="Auto" />
+                                        <DataGridTextColumn Header="分类" Binding="{Binding Category, UpdateSourceTrigger=PropertyChanged}" Width="60" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+
+                            <!-- AI filter configuration -->
+                            <StackPanel Margin="0,8,0,0" Visibility="{Binding EnableAiFilter, Converter={x:Static local:BoolToVisibilityConverter.Instance}}">
+                                <TextBlock Text="AI 过滤配置" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,4" />
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="过滤模型：" VerticalAlignment="Center" Margin="0,0,4,0" FontSize="11" />
+                                    <TextBox Grid.Row="0" Grid.Column="1"
+                                             Text="{Binding AiFilterModelName, UpdateSourceTrigger=PropertyChanged}"
+                                             FontSize="11" Padding="4,2"
+                                             ToolTip="留空则复用翻译 API 的模型名" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="过滤 Prompt：" VerticalAlignment="Top" Margin="0,4,4,0" FontSize="11" />
+                                    <TextBox Grid.Row="1" Grid.Column="1"
+                                             Text="{Binding AiFilterPrompt, UpdateSourceTrigger=PropertyChanged}"
+                                             FontSize="11" Padding="4,2"
+                                             AcceptsReturn="True"
+                                             TextWrapping="Wrap"
+                                             MaxHeight="80"
+                                             VerticalScrollBarVisibility="Auto"
+                                             ToolTip="留空使用默认过滤 Prompt。支持占位符：{sourceLang}, {targetLang}, {texts}" />
+                                </Grid>
+                                <TextBlock Text="⚠️ AI 过滤复用「自定义AI」的 API Key 和 Base URL 配置"
+                                           FontSize="10" Foreground="#FF666666" Margin="0,2,0,0"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </GroupBox>
+
+
+                <!-- ════════════════════════════════════════════════════════════
+                     翻译方式：左 = Excel 三步法 / 右 = MCP 一键翻译
+                     ════════════════════════════════════════════════════════════ -->
+                <Grid Margin="0,8,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- ── 左列：Excel 三步翻译法 ── -->
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="① Excel 三步翻译法"
+                                   FontSize="13" FontWeight="Bold" Foreground="#1E293B"
+                                   Margin="0,0,0,8" />
+
+                        <!-- Step 1: Extract & Export (with sub-button below) -->
+                        <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch" Margin="0,0,0,8">
+                            <Button Style="{DynamicResource StepButtonStyle}"
+                                    Command="{Binding ExtractAndExportCommand}"
+                                    ToolTip="提取 CAD 中的文字并导出为 Excel 翻译表">
+                                <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                    <TextBlock Text="① 提取导出"
+                                               FontSize="12" FontWeight="SemiBold"
+                                               HorizontalAlignment="Center" />
+                                    <TextBlock Text="CAD → Excel (原文/译文)"
+                                               FontSize="10" Opacity="0.85"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{DynamicResource BrowseButtonStyle}"
+                                    Command="{Binding ExportTranslationOnlyCommand}"
+                                    FontSize="10" Padding="6,4" Margin="4,4,4,0"
+                                    HorizontalAlignment="Center"
+                                    ToolTip="导出纯翻译对照表：仅2列(原文/译文)，只含已翻译且去重的条目。">
+                                <TextBlock Text="导出纯翻译" FontSize="10" TextWrapping="NoWrap" />
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Step 2: Translate -->
+                        <Button Style="{DynamicResource StepButtonStyle}"
+                                Command="{Binding TranslateCommand}"
+                                ToolTip="使用翻译 API 一键翻译 Excel 中的文字"
+                                Margin="0,0,0,3">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <TextBlock Text="② 一键翻译"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="API 自动翻译 Excel 译文列"
+                                           FontSize="10" Opacity="0.85"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- 自定义 Excel 路径（一键翻译用：导入外部 Excel 来一键翻译） -->
+                        <TextBlock Text="自定义 Excel（一键翻译）:"
+                                   FontSize="10" Foreground="#475569"
+                                   Margin="0,0,0,2" />
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding TranslateExcelPath, UpdateSourceTrigger=PropertyChanged}"
+                                     FontSize="10" Padding="4,2" VerticalAlignment="Center"
+                                     ToolTip="导入外部 Excel 来一键翻译（留空则使用上一步生成的 Excel）" />
+                            <Button Grid.Column="1" Content="浏览"
+                                    Style="{DynamicResource BrowseButtonStyle}"
+                                    Command="{Binding BrowseTranslateExcelCommand}"
+                                    FontSize="10" Padding="6,2" Margin="4,0,0,0"
+                                    ToolTip="选择待翻译的 Excel 文件" />
+                        </Grid>
+
+                        <!-- Step 3: Import & Write-back -->
+                        <Button Style="{DynamicResource StepButtonStyle}"
+                                Command="{Binding ImportAndWriteBackCommand}"
+                                ToolTip="导入已翻译的 Excel 并将译文回填到新 CAD 文件"
+                                Margin="0,0,0,3">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <TextBlock Text="③ 导入回填"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="Excel 译文列 → 新 CAD 文件"
+                                           FontSize="10" Opacity="0.85"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- 自定义 Excel 路径（导入回填用：导入自定义外部 Excel 回填 CAD） -->
+                        <TextBlock Text="自定义 Excel（回填 CAD）:"
+                                   FontSize="10" Foreground="#475569"
+                                   Margin="0,0,0,2" />
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding ImportExcelPath, UpdateSourceTrigger=PropertyChanged}"
+                                     FontSize="10" Padding="4,2" VerticalAlignment="Center"
+                                     ToolTip="导入自定义外部 Excel 回填 CAD（留空则使用上一步生成的 Excel）" />
+                            <Button Grid.Column="1" Content="浏览"
+                                    Style="{DynamicResource BrowseButtonStyle}"
+                                    Command="{Binding BrowseImportExcelCommand}"
+                                    FontSize="10" Padding="6,2" Margin="4,0,0,0"
+                                    ToolTip="选择已翻译的 Excel 文件" />
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- ── 右列：MCP 一键翻译 ── -->
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="② MCP 一键翻译"
+                                   FontSize="13" FontWeight="Bold" Foreground="#047857"
+                                   Margin="0,0,0,8" />
+
+                        <Border Background="#ECFDF5" BorderBrush="#6EE7B7"
+                                BorderThickness="1" CornerRadius="6"
+                                Padding="10" Margin="0,0,0,10">
+                            <StackPanel Orientation="Vertical">
+                                <TextBlock Text="📘 使用说明" FontWeight="Bold"
+                                           Foreground="#047857" Margin="0,0,0,4" />
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#065F46">
+                                    • 桥接已「集成启动」：点绿色按钮时若 CADTransLite.McpBridge.exe 未运行，会自动拉起（默认 127.0.0.1:8090），无需手动启动。&#10;• 本地翻译需对应引擎在跑（LibreTranslate 127.0.0.1:5000 / Argos 127.0.0.1:5001）。&#10;• 点下方绿色按钮，自动「提取→翻译→写回」，结果存为 xxx_translated.dwg/.dxf 并自动载入。&#10;• 与 AI 客户端（Claude/Cursor）调用的 MCP 服务是同一套管线。
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <Button Style="{DynamicResource McpButtonStyle}"
+                                Command="{Binding TranslateViaMcpCommand}"
+                                ToolTip="通过本地 MCP 桥接服务一键翻译当前图纸：提取 → 翻译 → 写回，并自动载入结果">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <TextBlock Text="⚡ MCP 一键翻译"
+                                           FontSize="13" FontWeight="Bold"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="当前图纸 → 桥接 → 翻译回写"
+                                           FontSize="10.5" Opacity="0.92"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Style="{DynamicResource BrowseButtonStyle}"
+                                Command="{Binding StartMcpBridgeCommand}"
+                                FontSize="11" Padding="8,6" Margin="0,8,0,0"
+                                HorizontalAlignment="Stretch"
+                                ToolTip="手动启动/检测 MCP 桥接服务（CADTransLite.McpBridge.exe）">
+                            <TextBlock Text="启动桥接" HorizontalAlignment="Center" />
+                        </Button>
+
+                        <!-- 翻译引擎选项已移至「③ 翻译API设置」顶部（与 API 设置放在一起） -->
+                    </StackPanel>
+                </Grid>
+
+                <!-- ──────────────────────────────────────────────────────────
+                     Progress Bar
+                     ────────────────────────────────────────────────────────── -->
+                <!-- 共享进度条：Excel 三步翻译法 与 MCP 一键翻译 共用，上方显示实时运行步骤 -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0"
+                               Text="{Binding StatusText}"
+                               FontSize="11.5"
+                               FontWeight="SemiBold"
+                               Foreground="#4F46E5"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,4" />
+                    <ProgressBar Grid.Row="1"
+                                 Height="12"
+                                 Minimum="0" Maximum="100"
+                                 Value="{Binding ProgressValue}"
+                                 Foreground="#4F46E5"
+                                 Background="#E2E8F0" />
+                </Grid>
+
+                <!-- ──────────────────────────────────────────────────────────
+                     Statistics
+                     ────────────────────────────────────────────────────────── -->
+                <TextBlock Text="{Binding StatisticsText}"
+                           FontSize="11" Foreground="#4F46E5"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,8"
+                           Visibility="{Binding StatisticsText,
+                               Converter={x:Static local:StringToVisibilityConverter.Instance}}" />
+
+                <!-- Workflow hint -->
+                <TextBlock Margin="0,12,0,0"
+                           FontSize="10" Foreground="#64748B"
+                           TextWrapping="Wrap">
+                    <Run Text="工作流：" FontWeight="SemiBold" />
+                    <Run Text="拖入 .dwg/.dxf → ①提取导出（可手动编辑 Excel 译文列）→ ②一键翻译（可选）→ ③导入回填 → 生成新 CAD 文件" />
+                </TextBlock>
+
+                <!-- ──────────────────────────────────────────────────────────
+                     Donation Section (Collapsible)
+                     ────────────────────────────────────────────────────────── -->
+                <Expander IsExpanded="False"
+                          Header="☕ 打赏支持"
+                          FontSize="13" FontWeight="SemiBold"
+                          Foreground="#5D4037"
+                          Cursor="Hand"
+                          HorizontalAlignment="Center"
+                          Margin="0,20,0,0">
+                    <StackPanel HorizontalAlignment="Center"
+                                Margin="0,4,0,16">
+
+                            <!-- QR Code Image -->
+                            <Border Background="#F8FAFC"
+                                    CornerRadius="6"
+                                    Padding="16"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,0,0,8">
+                                <Image Source="pack://application:,,,/Images/打赏二维码.jpg"
+                                       Width="300" Height="300"
+                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                       ToolTip="微信扫码打赏" />
+                            </Border>
+
+                            <TextBlock Text="微信扫码打赏"
+                                       FontSize="10" Foreground="#64748B"
+                                       HorizontalAlignment="Center" />
+
+                    </StackPanel>
+                </Expander>
+
+                <!-- Author WeChat Public Account (bottom of content) -->
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            Margin="0,12,0,4">
+                    <TextBlock Text="作者公众号：" FontSize="11" Foreground="#64748B"
+                               VerticalAlignment="Center" />
+                    <TextBlock FontSize="11" VerticalAlignment="Center">
+                        <Hyperlink NavigateUri="https://mp.weixin.qq.com/s/W_KSe9aDSoqeDVgslfcWcg"
+                                   RequestNavigate="Hyperlink_RequestNavigate"
+                                   Foreground="#4F46E5"
+                                   FontWeight="SemiBold">
+                            山医命象卜
+                        </Hyperlink>
+                    </TextBlock>
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ================================================================
+             Status Bar
+             ================================================================ -->
+        <StatusBar Grid.Row="1"
+                   Background="#4F46E5"
+                   Foreground="White"
+                   Height="26">
+            <StatusBarItem>
+                <TextBlock Text="CADTrans Lite v3.5  •  基于 netDxf + EPPlus + ODA"
+                           FontSize="10" Foreground="#E0E7FF" />
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <ProgressBar Width="100" Height="8"
+                             Minimum="0" Maximum="100"
+                             Value="{Binding ProgressValue}"
+                             Foreground="#EEF2FF"
+                             Background="#4338CA"
+                             Visibility="{Binding IsProcessing,
+                                 Converter={x:Static local:BoolToVisibilityConverter.Instance}}" />
+            </StatusBarItem>
+        </StatusBar>
+
+    </Grid>
+</Window>
+
+
+
+
+
+
+

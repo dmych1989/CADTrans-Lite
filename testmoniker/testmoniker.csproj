@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+  <Target Name="PrintMoniker" BeforeTargets="CollectPackageReferences">
+    <Message Text="NuGetTargetMoniker=$(NuGetTargetMoniker)" Importance="High" />
+    <Message Text="_NugetTargetMonikerAndRID=$(_NugetTargetMonikerAndRID)" Importance="High" />
+    <Message Text="TargetFrameworkMoniker=$(TargetFrameworkMoniker)" Importance="High" />
+  </Target>
+</Project>

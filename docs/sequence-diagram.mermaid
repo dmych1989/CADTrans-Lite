@@ -1,0 +1,83 @@
+sequenceDiagram
+    participant User
+    participant DwgExtractor
+    participant DxfRawParser
+    participant MTextCodec
+    participant DxfTextCleaner
+    participant TranslationMerger
+    participant ExcelHandler
+    participant DwgWriter
+    participant DxfTextReplacer
+    participant DxfStyleManager
+
+    Note over User,DxfStyleManager: Phase 2 — 提取流程
+
+    User->>DwgExtractor: ExtractAndMerge(filePath)
+    DwgExtractor->>DwgExtractor: Load DXF via netDxf
+    DwgExtractor->>DwgExtractor: Extract TEXT entities (现有)
+    DwgExtractor->>DwgExtractor: Extract MTEXT entities (现有)
+    DwgExtractor->>DwgExtractor: Extract INSERT/Attribute (现有)
+
+    alt ImportAcadTables == true
+        DwgExtractor->>DxfRawParser: ParseAcadTables(filePath)
+        DxfRawParser->>DxfRawParser: Read DXF lines, detect "0 ACAD_TABLE"
+        DxfRawParser->>DxfRawParser: Parse AcDbTable subclass (91=nRows, 92=nCols)
+        DxfRawParser->>DxfRawParser: Parse cell text (R2004: code 1/2/3; R2007+: code 302)
+        DxfRawParser-->>DwgExtractor: List<AcadTableData>
+        loop For each table / each text cell
+            DwgExtractor->>MTextCodec: StripFormatCodes(cellText)
+            MTextCodec-->>DwgExtractor: plainText + placeholders
+            DwgExtractor->>DxfTextCleaner: Clean(plainText, config)
+            DxfTextCleaner-->>DwgExtractor: (cleanedText, wasFiltered, reason)
+            DwgExtractor->>DwgExtractor: Create TranslationItem (Handle=table::R{r}::C{c})
+        end
+    end
+
+    alt ImportMultiLeaders == true
+        DwgExtractor->>DxfRawParser: ParseMultiLeaders(filePath)
+        DxfRawParser->>DxfRawParser: Read DXF lines, detect "0 MULTILEADER"
+        DxfRawParser->>DxfRawParser: Parse context data (code 304 = text)
+        DxfRawParser-->>DwgExtractor: List<MultiLeaderData>
+        loop For each MLEADER with ContentType==2
+            DwgExtractor->>MTextCodec: StripFormatCodes(textContent)
+            MTextCodec-->>DwgExtractor: plainText + placeholders
+            DwgExtractor->>DxfTextCleaner: Clean(plainText, config)
+            DwgExtractor-->>DwgExtractor: TranslationItem (Handle=ml::CTX)
+        end
+    end
+
+    DwgExtractor->>TranslationMerger: Merge(rawItems)
+    TranslationMerger-->>DwgExtractor: mergedItems
+    DwgExtractor-->>User: (mergedItems, rawItemCount)
+
+    Note over User,DxfStyleManager: Phase 2 — 回写流程
+
+    User->>DwgWriter: WriteBack(sourceFilePath, mergedItems)
+    DwgWriter->>DwgWriter: Load DXF via netDxf
+    DwgWriter->>DwgWriter: Build lookup dicts (TEXT/MTEXT/Attribute)
+
+    loop For each expanded item
+        alt EntityType == Text/MText/Attribute
+            DwgWriter->>DwgWriter: Write back via netDxf (existing logic)
+            DwgWriter->>DxfStyleManager: EnsureUnicodeStyle(doc, text, styleName)
+        else EntityType == TableCell
+            DwgWriter->>DwgWriter: Collect into tableReplacement list
+        else EntityType == MLeader
+            DwgWriter->>DwgWriter: Collect into mleaderReplacement list
+        end
+    end
+
+    DwgWriter->>DwgWriter: doc.Save(tempOutputPath) — netDxf save
+
+    alt Has ACAD_TABLE or MLEADER replacements
+        DwgWriter->>DxfTextReplacer: Replace(tempOutputPath, replacements)
+        DxfTextReplacer->>DxfRawParser: ParseAcadTables / ParseMultiLeaders (with line positions)
+        DxfRawParser-->>DxfTextReplacer: Entity positions + text locations
+        DxfTextReplacer->>DxfTextReplacer: Replace cell text (code 1/302) for ACAD_TABLE
+        DxfTextReplacer->>DxfTextReplacer: Replace text (code 304) for MULTILEADER
+        DxfTextReplacer->>DxfStyleManager: EnsureUnicodeStyle for translated text
+        DxfTextReplacer->>DxfTextReplacer: Update style name/handle in DXF text
+        DxfTextReplacer-->>DwgWriter: (updated, notFound, log)
+    end
+
+    DwgWriter-->>User: (outputFilePath, log)
