@@ -53,37 +53,46 @@
           SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- ── Shared embedded Python runtime (tools/py): LibreTranslate + Argos ─────
-       Copy the bundled Python interpreter + server scripts + language packages from
-       repo_root/tools/py into the output dir when present. Non-fatal: skipped if the folder
-       has not been provisioned via setup_engines.ps1. -->
-  <Target Name="CopyPyRuntime" AfterTargets="Build">
+  <!-- ── Bergamot offline model directory (tools/bergamot) ─────────────────────
+       Copy the Bergamot translation models (downloaded via tools/setup_bergamot.ps1)
+       into the output directory when present. Non-fatal: skipped if the folder has not
+       been provisioned. No Python runtime is shipped. -->
+  <Target Name="CopyBergamotRuntime" AfterTargets="Build">
     <ItemGroup>
-      <PyFiles Include="$(MSBuildProjectDirectory)\..\..\tools\py\**\*.*" />
+      <BergamotFiles Include="$(MSBuildProjectDirectory)\..\..\tools\bergamot\**\*.*" />
     </ItemGroup>
-    <Copy SourceFiles="@(PyFiles)"
-          DestinationFiles="@(PyFiles->'$(OutDir)tools\py\%(RecursiveDir)%(Filename)%(Extension)')"
+    <Copy SourceFiles="@(BergamotFiles)"
+          DestinationFiles="@(BergamotFiles->'$(OutDir)tools\bergamot\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true"
-          Condition="'@(PyFiles)' != ''" />
+          ContinueOnError="WarnAndContinue"
+          Condition="'@(BergamotFiles)' != ''" />
   </Target>
-
-  <!-- Also ship the embedded Python runtime with the published (self-contained) output.
-       Copy from the already-verified build output $(OutDir)tools\py (populated by CopyPyRuntime
-       above) rather than the raw source tree, so the published copy is byte-identical to the
-       working build output and cannot be re-corrupted by a second publish-pipeline copy. -->
-  <Target Name="CopyPyRuntimePublish" AfterTargets="Publish">
+  <Target Name="CopyBergamotRuntimePublish" AfterTargets="Publish">
     <ItemGroup>
-      <PyFilesPublish Include="$(OutDir)tools\py\**\*.*" />
+      <BergamotFilesPublish Include="$(OutDir)tools\bergamot\**\*.*" />
     </ItemGroup>
-    <Copy SourceFiles="@(PyFilesPublish)"
-          DestinationFiles="@(PyFilesPublish->'$(PublishDir)tools\py\%(RecursiveDir)%(Filename)%(Extension)')"
+    <Copy SourceFiles="@(BergamotFilesPublish)"
+          DestinationFiles="@(BergamotFilesPublish->'$(PublishDir)tools\bergamot\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true"
-          Condition="'@(PyFilesPublish)' != ''" />
+          ContinueOnError="WarnAndContinue"
+          Condition="'@(BergamotFilesPublish)' != ''" />
   </Target>
 
   <!-- Disable package resolution -->
+  <!-- ── Self-contained publish (no .NET install required on the user machine) ──
+       dotnet publish -c Release produces a framework-independent build that bundles
+       the .NET 9 runtime into publish/. The user's PC does NOT need the .NET runtime
+       installed. Use publish_app.ps1 at the repo root to build this automatically. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <!-- Trim unused runtime bits to shrink the bundle (safe for a WPF WinExe). -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishSingleFile>false</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
   <PropertyGroup>
-    <GenerateDependencyFile>false</GenerateDependencyFile>
     <GenerateNuGetAudit>false</GenerateNuGetAudit>
   </PropertyGroup>
 

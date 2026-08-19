@@ -1,5 +1,5 @@
 // LocalServiceStatus.cs
-// 本地翻译服务（LibreTranslate / Argos / NLLB）的运行状态模型，供 WPF 绑定显示。
+// 本地翻译服务（LibreTranslate / NLLB）的运行状态模型，供 WPF 绑定显示。
 using System.ComponentModel;
 using System.Windows.Media;
 

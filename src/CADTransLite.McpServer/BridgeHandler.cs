@@ -27,7 +27,6 @@ internal static class BridgeHandler
             {
                 "translate_text" => await TranslateText(p, ct),
                 "list_engines" => ListEngines(),
-                "list_language_pairs" => await ListLanguagePairs(p),
                 "read_entities" => await ReadEntities(p, ct),
                 "write_translation" => await WriteTranslation(p, ct),
                 "translate_drawing" => await TranslateDrawing(p, ct),
@@ -51,7 +50,7 @@ internal static class BridgeHandler
 
         var src = p.Str("source", "en");
         var tgt = p.Str("target", "zh");
-        var engine = p.Str("engine", "Argos Translate (本地)");
+        var engine = p.Str("engine", "Bergamot (本地)");
         var cfg = ParseConfig(p);
 
         var api = EngineFactory.Build(engine, cfg);
@@ -73,31 +72,8 @@ internal static class BridgeHandler
     {
         engines = EngineFactory.EngineNames,
         local_defaults = EngineFactory.LocalDefaults,
-        note = "本地引擎(Argos/LibreTranslate/NLLB/DeepLX)需对应 HTTP 服务已启动；远程引擎(百度/腾讯/Microsoft/DeepL/自定义AI)需提供 API 密钥。"
+        note = "本地引擎(Bergamot 纯.NET离线/DeepLX)中，Bergamot 无需启动服务、无 Python 依赖（模型在 tools/bergamot 下）；远程引擎(百度/腾讯/Microsoft/DeepL/自定义AI)需提供 API 密钥。"
     });
-
-    static async Task<BridgeResponse> ListLanguagePairs(JsonElement p)
-    {
-        var url = p.Str("argos_url", EngineFactory.LocalDefaults["argos_url"]);
-        try
-        {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-            var raw = await http.GetStringAsync(url.TrimEnd('/') + "/ready");
-            int numModels = -1;
-            try
-            {
-                using var doc = JsonDocument.Parse(raw);
-                if (doc.RootElement.TryGetProperty("num_models", out var nm)) numModels = nm.GetInt32();
-            }
-            catch { /* ignore parse issues */ }
-
-            return BridgeResponse.Ok(new { argos_url = url, ready = true, num_models = numModels, raw });
-        }
-        catch (Exception ex)
-        {
-            return BridgeResponse.Ok(new { argos_url = url, ready = false, error = ex.Message });
-        }
-    }
 
     static async Task<BridgeResponse> ReadEntities(JsonElement p, CancellationToken ct)
     {
@@ -241,7 +217,7 @@ internal static class BridgeHandler
 
         var src = p.Str("source", "en");
         var tgt = p.Str("target", "zh");
-        var engine = p.Str("engine", "Argos Translate (本地)");
+        var engine = p.Str("engine", "Bergamot (本地)");
         var cfg = ParseConfig(p);
         var import = ParseImportSettings(p);
 
@@ -306,20 +282,20 @@ internal static class BridgeHandler
 
     static async Task<BridgeResponse> GetStatus(JsonElement p)
     {
-        var argosUrl = p.Str("argos_url", EngineFactory.LocalDefaults["argos_url"]);
-        var argosReady = await ProbeArgos(argosUrl);
+        var libreUrl = p.Str("libre_url", EngineFactory.LocalDefaults["libre_url"]);
+        var libreReady = await ProbeLibre(libreUrl);
         return BridgeResponse.Ok(new
         {
             ready = true,
-            argos_url = argosUrl,
-            argos_ready = argosReady,
+            libre_url = libreUrl,
+            libre_ready = libreReady,
             cwd = Directory.GetCurrentDirectory()
         });
     }
 
     // --- helpers ----------------------------------------------------------
 
-    static async Task<bool> ProbeArgos(string url)
+    static async Task<bool> ProbeLibre(string url)
     {
         try
         {
@@ -338,7 +314,7 @@ internal static class BridgeHandler
         var cfg = new Dictionary<string, string>();
         foreach (var key in new[]
         {
-            "argos_url", "libre_url", "nllb_url", "deeplx_url",
+            "libre_url", "nllb_url", "deeplx_url",
             "base_url", "api_key", "model",
             "app_id", "app_key", "secret_id", "secret_key", "region"
         })

@@ -121,6 +121,19 @@ public sealed class DwgWriter
                     expandedItems.Add(expanded);
                 }
             }
+            else if (item.CadHandles.Count > 1)
+            {
+                // 去重组信息(MergedItems)在跨会话/独立导入时可能丢失，仅保留首个句柄；
+                // 用 CadHandles 把相同文本的其余实例一并展开，避免“同样的文字只替换了一个”。
+                foreach (var h in item.CadHandles)
+                {
+                    var expanded = CloneItem(item);
+                    expanded.Handle = h;
+                    expanded.CadHandles = new List<string> { h };
+                    expanded.TranslatedText = item.TranslatedText;
+                    expandedItems.Add(expanded);
+                }
+            }
             else
             {
                 expandedItems.Add(item);

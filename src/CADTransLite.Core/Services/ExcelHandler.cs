@@ -39,8 +39,9 @@ public sealed class ExcelHandler
     private const int ColId           = 1;   // A — id (Handle)
     private const int ColOriginalText = 2;   // B — 原文
     private const int ColTranslated   = 3;   // C — 翻译
+    private const int ColAllHandles   = 4;   // D — 全部句柄(隐藏，去重组所有句柄)
 
-    private const int RichColumnCount = 3;
+    private const int RichColumnCount = 4;
 
     // Row at which data starts (row 1 is the header).
     private const int DataStartRow = 2;
@@ -321,6 +322,14 @@ public sealed class ExcelHandler
                 : MTextCodec.StripForTranslation(item.TranslatedText);
             ws.Cells[row, ColTranslated].Value = translatedClean;
 
+            // Column D (隐藏): 全部句柄 — 去重组在 Excel 只占一行(id 为首个句柄)，
+            // 这里用 ';' 连接该组所有句柄，确保跨会话/独立导入回填时其余相同文本
+            // 实例不丢失（见 WriteBack 的 CadHandles 展开逻辑）。
+            if (item.CadHandles != null && item.CadHandles.Count > 1)
+            {
+                ws.Cells[row, ColAllHandles].Value = string.Join(";", item.CadHandles);
+            }
+
             // ── Cell styling ────────────────────────────────────────────
             // id 列：灰色背景（元数据/只读标识列）
             StyleMetadataCell(ws.Cells[row, ColId]);
@@ -489,10 +498,20 @@ public sealed class ExcelHandler
                 ExcelRowIndex = row,
             };
 
+            // 读取隐藏列“全部句柄”：去重组在 Excel 只占一行(id 为首个句柄)，
+            // 该列补全其余相同文本实例的句柄，使跨会话/独立导入回填时不漏替换。
+            var cadHandles = ReadCadHandles(ws, row);
             if (!string.IsNullOrEmpty(handleVal))
             {
                 item.Handle = handleVal;
-                item.CadHandles = new List<string> { handleVal };
+                item.CadHandles = cadHandles != null && cadHandles.Count > 0
+                    ? cadHandles
+                    : new List<string> { handleVal };
+            }
+            else if (cadHandles != null && cadHandles.Count > 0)
+            {
+                item.Handle = cadHandles[0];
+                item.CadHandles = cadHandles;
             }
 
             // 保留 id（Handle）用于回填精确匹配；其余元数据列已删除，不再读取。
@@ -735,6 +754,24 @@ public sealed class ExcelHandler
     // =======================================================================
     // Clone helper
     // =======================================================================
+
+    /// <summary>
+    /// 读取隐藏列“全部句柄”（去重组所有句柄，用 ';' 连接）。
+    /// 该列不存在或为空时返回 null（兼容旧版仅 3 列的 Excel）。
+    /// </summary>
+    private static List<string>? ReadCadHandles(ExcelWorksheet ws, int row)
+    {
+        var cell = ws.Cells[row, ColAllHandles].GetValue<string>();
+        var v = cell?.Trim();
+        if (string.IsNullOrEmpty(v))
+            return null;
+
+        var list = v.Split(';')
+                    .Select(s => s.Trim())
+                    .Where(s => s.Length > 0)
+                    .ToList();
+        return list.Count > 0 ? list : null;
+    }
 
     private static TranslationItem CloneItem(TranslationItem src) => new()
     {

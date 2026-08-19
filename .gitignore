@@ -58,6 +58,17 @@ Desktop.ini
 
 # ── Local publish output (self-contained build artifacts) ──
 publish/
+publish_stage/
+
+# ── Bergamot offline models (downloaded via tools/setup_bergamot.ps1, not committed) ──
+tools/bergamot/
+
+# ── Misc local helper scripts / pid files ──
+*.pid
+_clean_tmp.ps1
+_verify_servers.py
+tools/_probe_argos.py
+tools/_run_bergamot_dl.bat
 
 # ── Standalone third-party binaries at repo root ──
 deeplx_windows_amd64.exe

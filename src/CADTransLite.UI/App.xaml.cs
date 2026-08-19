@@ -50,7 +50,23 @@ public partial class App : Application
         // Unobserved task exceptions (async)
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
-            ErrorLogger.Instance.Error("UnobservedTask", args.Exception);
+            // 多数情况是「进程退出 / Cancellation 传播」时，fire-and-forget 的端口探测 socket
+            // 被中止（"由于线程退出或应用程序请求，已中止 I/O 操作" / OperationCanceledException）。
+            // 这类是正常副作用而非业务错误，降级为 Debug，避免刷屏误导用户。
+            bool benign = args.Exception?.InnerExceptions != null &&
+                          args.Exception.InnerExceptions.All(x =>
+                              x is OperationCanceledException ||
+                              x is System.Net.Sockets.SocketException ||
+                              (x is IOException io && (io.Message.Contains("中止") || io.Message.Contains("aborted", StringComparison.OrdinalIgnoreCase))));
+
+            if (benign)
+            {
+                // 良性异常（进程退出/取消期间的 socket 中止）属预期副作用，
+                // 完全不记日志以免刷屏；仅标记已观察防止进程崩溃即可。
+            }
+            else
+                ErrorLogger.Instance.Error("UnobservedTask", args.Exception ?? new Exception("(no exception object)"));
+
             args.SetObserved();
         };
 
@@ -84,36 +100,8 @@ public partial class App : Application
                 });
             }
 
-            // LibreTranslate: 内置嵌入式 Python，自动以模块方式拉起 libretranslate 服务 (默认端口 5000)。
-            if (api.EnableLibreTranslate)
-            {
-                Task.Run(() =>
-                {
-                    var proc = LocalServerHelper.TryStartBundledServer(
-                        "python.exe",
-                        new[] { "-m", "libretranslate", "--host", "127.0.0.1", "--port", "5000" },
-                        "tools/py");
-                    if (proc is null)
-                        ErrorLogger.Instance.Warn("App",
-                            "未在 tools/py 找到 python.exe，LibreTranslate 需先运行 setup_engines.ps1 安装。");
-                });
-            }
-
-            // Argos Translate: 内置 tools/py/python.exe，自动拉起 python 本地服务 (默认端口 5001)。
-            if (api.EnableArgos)
-            {
-                Task.Run(() =>
-                {
-                    var proc = LocalServerHelper.TryStartBundledServer(
-                        "python.exe",
-                        new[] { "argos_server.py", "--port", "5001" },
-                        "tools/py");
-                    if (proc is null)
-                        ErrorLogger.Instance.Warn("App",
-                            "未在 tools/py 找到 python.exe，Argos 需先运行 setup_engines.ps1 安装。");
-                });
-            }
-
+            // 注：本地 Python 引擎（LibreTranslate / NLLB）不在启动时拉起嵌入式 Python 子进程；
+            // 本地离线翻译现由「Bergamot (本地)」进程内引擎与按需启动的本地服务共同提供。
 
         }
         catch (Exception ex)
@@ -124,6 +112,49 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        try
+        {
+            // 停止后台端口轮询定时器，避免退出阶段 socket 探测被中止而产生「未观察 Task 异常」噪声。
+            if (MainWindow is MainWindow mw && mw.DataContext is MainWindowViewModel vm)
+                vm.StopMonitoring();
+        }
+        catch { /* ignore */ }
+
+        // 关闭软件时回收本会话启动的所有本地翻译引擎子进程（python.exe 等），
+        // 避免它们残留后台继续占用 5000/5001/5002 端口，导致下次启动连到失效的旧服务
+        // 而「测试失败」。此前 OnExit 漏调此方法，是引擎关不掉的根因。
+        try
+        {
+            LocalServerHelper.ShutdownAllOwned();
+        }
+        catch { /* ignore */ }
+
+        // 额外清理仍 LISTENING 的历史残留进程（如上次异常退出、未走本会话 ShutdownAllOwned
+        // 而遗留的孤儿 python 实例）。本会话的已被上面回收，剩下的监听者即历史残留。
+        // 端口优先读取用户自定义设置（LibreTranslate/NLLB 的「API 地址」可能改过端口），
+        // 并兜底保留默认 5000/5001/5002，确保「自定义端口」也能在退出时被清理。
+        try
+        {
+            var ports = new HashSet<int> { 5000, 5001, 5002, 1188 };
+            try
+            {
+                var api = new SettingsManager().Load().TranslationApi;
+                foreach (var url in new[] { api.LibreTranslateUrl, api.NllbUrl, api.DeepLXUrl })
+                {
+                    if (LocalServerHelper.TryParseHostPort(url, out _, out var p))
+                        ports.Add(p);
+                }
+            }
+            catch
+            {
+                // 读取失败则只用默认端口兜底。
+            }
+
+            foreach (var port in ports)
+                LocalServerHelper.StopServerOnPort("127.0.0.1", port);
+        }
+        catch { /* ignore */ }
+
         ErrorLogger.Instance.Info("App", "CADTrans Lite 退出");
         ErrorLogger.Instance.Info("App", "═══════════════════════════════════════════");
         base.OnExit(e);

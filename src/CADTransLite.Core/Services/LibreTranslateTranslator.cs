@@ -12,8 +12,9 @@ using CADTransLite.Core.Models;
 //   - all traffic stays on 127.0.0.1, so no key / cloud round-trip is involved.
 //
 // Note: LibreTranslate has no official Windows .exe — on Windows it runs as a Python module. The
-// bundled embedded Python lives at tools/py, shared with the Argos engine.
+// bundled embedded Python lives at tools/py (shared argostranslate packages).
 
+using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -24,7 +25,7 @@ namespace CADTransLite.Core.Services;
 /// Requires <see cref="TranslationApiConfig.BaseUrl"/> pointing at the running server
 /// (default http://127.0.0.1:5000).
 /// </summary>
-public sealed class LibreTranslateTranslator : ITranslationApi
+    public sealed class LibreTranslateTranslator : ITranslationApi
 {
     public string Name => "LibreTranslate (本地)";
 
@@ -43,6 +44,10 @@ public sealed class LibreTranslateTranslator : ITranslationApi
     private readonly string _baseUrl;
     private readonly HttpClient _http;
     private bool _startedOnce;
+    // 按 URL 串行化启动，避免并发调用各自拉起一个服务（竞态导致多进程抢端口、
+    // 被 ShouldStartFreshServer 误判“非本会话占用”而反复杀掉重启，造成“测试失败”）。
+    // 与 Argos/NLLB 适配器保持一致。
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _startGates = new(StringComparer.OrdinalIgnoreCase);
 
     public LibreTranslateTranslator(TranslationApiConfig config)
     {
@@ -82,9 +87,14 @@ public sealed class LibreTranslateTranslator : ITranslationApi
                     var translated = t.GetString();
                     // Surface empty translations as a clear error instead of silently writing
                     // blank cells into the Excel file.
-                    if (!string.IsNullOrWhiteSpace(text) && string.IsNullOrWhiteSpace(translated))
-                        throw new InvalidOperationException(
-                            "LibreTranslate 返回了空译文（引擎可能尚未就绪或语言包缺失）。请确认已通过 setup_engines.ps1 安装语言包。");
+                if (!string.IsNullOrWhiteSpace(text) && string.IsNullOrWhiteSpace(translated))
+                {
+                    // 服务返回了空译文：可能是坏实例/语言包缺失。强制下次 EnsureReadyAsync 重新评估
+                    // （若占用者非本会话，会清理并重启一个干净实例）。
+                    _startedOnce = false;
+                    throw new InvalidOperationException(
+                        "LibreTranslate 返回了空译文（引擎可能尚未就绪或语言包缺失）。请确认已通过 setup_engines.ps1 安装语言包。");
+                }
                     return translated ?? string.Empty;
                 }
                 throw new InvalidOperationException("LibreTranslate 返回结果缺少 translatedText 字段。");
@@ -92,6 +102,8 @@ public sealed class LibreTranslateTranslator : ITranslationApi
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 lastError = ex;
+                // 翻译失败：重置就绪标记，下次 EnsureReadyAsync 会重新探测并在必要时重启坏服务。
+                _startedOnce = false;
                 await EnsureReadyAsync(cancellationToken).ConfigureAwait(false);
                 await Task.Delay(300 * (attempt + 1), cancellationToken).ConfigureAwait(false);
             }
@@ -105,58 +117,63 @@ public sealed class LibreTranslateTranslator : ITranslationApi
     {
         if (_startedOnce) return;
 
-        if (!LocalServerHelper.TryParseHostPort(_baseUrl, out var host, out var port))
-            throw new InvalidOperationException($"无法解析 LibreTranslate 本地服务地址: {_baseUrl}");
-
-        // If nothing is listening yet, launch the embedded python that hosts the libretranslate module.
-        if (!LocalServerHelper.IsPortOpen(host, port))
+        // 串行化：同一 URL 只容许一个调用进入启动流程，杜绝并发竞态导致多个
+        // LibreTranslate 进程同时拉起、互相抢端口而崩溃，造成“测试失败”。
+        var gate = _startGates.GetOrAdd(_baseUrl, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            LocalServerHelper.TryStartBundledServer(
-                PythonExeName,
-                new[] { "libretranslate_server.py", "--host", "127.0.0.1", "--port", port.ToString() },
-                PyRuntimeSubDir);
-        }
+            if (_startedOnce) return;
 
-        // Wait until the server can actually translate. Loading language models on first launch can
-        // take well over a minute, so poll generously and treat an empty result / error as
-        // "still warming up" instead of giving up early.
-        using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-        var probeBody = new Dictionary<string, string> { ["q"] = "hi", ["source"] = "en", ["target"] = "zh", ["format"] = "text" };
+            if (!LocalServerHelper.TryParseHostPort(_baseUrl, out var host, out var port))
+                throw new InvalidOperationException($"无法解析 LibreTranslate 本地服务地址: {_baseUrl}");
 
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(MaxReadyWaitSeconds);
-        while (DateTime.UtcNow < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
+            // 与 NLLB 保持一致：使用 ShouldStartFreshServer 决策，清理“非本会话”占端口的
+            // 残留坏实例（上次调试遗留的 python 进程会坑本地引擎，使其连到半坏服务而“测试失败”），
+            // 再拉起干净的 LibreTranslate 实例，并等待端口真正可服务。
+            if (LocalServerHelper.ShouldStartFreshServer(host, port))
             {
-                using var resp = await probe.PostAsJsonAsync($"{_baseUrl}/translate", probeBody, JsonOptions, cancellationToken)
-                    .ConfigureAwait(false);
-                if (resp.IsSuccessStatusCode)
+                // 若上面清理了非本会话的占用者，等端口真正释放再启动，避免新实例绑定冲突。
+                var closeDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(6);
+                while (DateTime.UtcNow < closeDeadline && LocalServerHelper.IsPortOpen(host, port))
+                    await Task.Delay(200, cancellationToken).ConfigureAwait(false);
+
+                // 最多尝试启动 2 次：若新实例因端口尚未完全释放而绑定失败，清理后重试一次。
+                for (int startTry = 0; startTry < 2; startTry++)
                 {
-                    using var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken)
-                        .ConfigureAwait(false);
-                    if (doc.RootElement.TryGetProperty("translatedText", out var t) && !string.IsNullOrWhiteSpace(t.GetString()))
+                    LocalServerHelper.TryStartBundledServer(
+                        PythonExeName,
+                        new[] { "libretranslate_server.py", "--host", "127.0.0.1", "--port", port.ToString() },
+                        PyRuntimeSubDir);
+
+                    // 仅等待端口开放（确认 python 进程已起来并开始监听），最多 30s；
+                    // 模型冷加载由真实请求的长超时覆盖，不在此等待。
+                    var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+                    while (DateTime.UtcNow < deadline)
                     {
-                        _startedOnce = true;
-                        return;
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (LocalServerHelper.IsPortOpen(host, port))
+                            break;
+                        await Task.Delay(500, cancellationToken).ConfigureAwait(false);
                     }
+
+                    if (LocalServerHelper.IsPortOpen(host, port))
+                        break;
+
+                    // 端口仍未开放：新实例可能绑定失败，清理后重试。
+                    LocalServerHelper.StopServerOnPort(host, port);
+                    var retryClose = DateTime.UtcNow + TimeSpan.FromSeconds(6);
+                    while (DateTime.UtcNow < retryClose && LocalServerHelper.IsPortOpen(host, port))
+                        await Task.Delay(200, cancellationToken).ConfigureAwait(false);
                 }
             }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                // server still warming up or not responding yet — keep polling
-            }
 
-            await Task.Delay(ReadyPollIntervalMs, cancellationToken).ConfigureAwait(false);
+            _startedOnce = true;
         }
-
-        // Timed out waiting for readiness. Mark as started so we don't loop forever; the real
-        // translation request will surface a clear error if the server is genuinely broken.
-        _startedOnce = true;
+        finally
+        {
+            gate.Release();
+        }
     }
 
     public void Dispose() => _http.Dispose();

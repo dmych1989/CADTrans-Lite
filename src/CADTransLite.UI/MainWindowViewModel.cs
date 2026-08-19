@@ -26,7 +26,7 @@ using Microsoft.Win32;
 
 namespace CADTransLite.UI
 {
-    public class MainWindowViewModel : INotifyPropertyChanged
+    public class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     {
         // ─────────────────────────────────────────────────────────────
         // Service fields
@@ -91,20 +91,17 @@ namespace CADTransLite.UI
         private bool _enableLibreTranslate;
         private string _libreTranslateUrl = "http://127.0.0.1:5000";
 
-        // Argos Translate (本地)
-        private bool _enableArgos;
-        private string _argosUrl = "http://127.0.0.1:5001";
-
         // NLLB (本地离线)
         private bool _enableNllb;
         private string _nllbUrl = "http://127.0.0.1:5002";
 
         // ─────────────────────────────────────────────────────────────
-        // 本地服务（LibreTranslate / Argos / NLLB）实时运行状态
+        // 本地服务（LibreTranslate / NLLB）实时运行状态
         // ─────────────────────────────────────────────────────────────
         private readonly LocalServiceStatus _libreTranslateService = new();
-        private readonly LocalServiceStatus _argosService = new();
         private readonly LocalServiceStatus _nllbService = new();
+        private readonly LocalServiceStatus _bergamotService = new();
+        private readonly LocalServiceStatus _deepLXService = new();
         private readonly System.Timers.Timer _localServiceMonitor;
 
         // DeepL
@@ -189,7 +186,16 @@ namespace CADTransLite.UI
             _localServiceMonitor.Elapsed += (_, __) => RefreshLocalServiceStatuses();
             _localServiceMonitor.AutoReset = false; // 每次处理完再重新计时，避免重叠执行
             _localServiceMonitor.Start();
-            _ = Task.Run(() => RefreshLocalServiceStatuses());
+            // fire-and-forget 首次探测：用 try/catch 观察异常，避免「未观察的 Task 异常」噪声
+            // （端口探测 socket 在进程退出/取消时会被中止，属良性副作用）。
+            _ = Task.Run(() =>
+            {
+                try { RefreshLocalServiceStatuses(); }
+                catch (Exception probeEx)
+                {
+                    ErrorLogger.Instance.Info("LocalServiceMonitor", $"初始探测异常（已忽略）：{probeEx.Message}");
+                }
+            });
         }
 
         /// <summary>
@@ -326,12 +332,32 @@ namespace CADTransLite.UI
                 OnPropertyChanged(nameof(MicrosoftSettingsVisibility));
                 OnPropertyChanged(nameof(DeepLSettingsVisibility));
                 OnPropertyChanged(nameof(DeepLXSettingsVisibility));
-                OnPropertyChanged(nameof(LibreTranslateSettingsVisibility));
-                OnPropertyChanged(nameof(ArgosSettingsVisibility));
-                OnPropertyChanged(nameof(NllbSettingsVisibility));
+                OnPropertyChanged(nameof(BergamotSettingsVisibility));
                 OnPropertyChanged(nameof(CustomAISettingsVisibility));
                 OnPropertyChanged(nameof(SupportedModelsText));
                 UpdateLanguageLists();
+
+                // 选择 DeepLX 引擎时立即拉起本地代理（deeplx_windows_amd64.exe），
+                // 避免沿用旧的「首次翻译才启动」策略而让用户等待模型冷启动或遇到连接失败。
+                // 端口已监听则 TryStartBundledServer 会自动跳过，不会重复拉起。
+                if (value == "DeepLX")
+                {
+                    try
+                    {
+                        if (LocalServerHelper.TryParseHostPort(_deepLXUrl, out _, out var dxPort))
+                            LocalServerHelper.TryStartBundledServer(
+                                "deeplx_windows_amd64.exe",
+                                new[] { "-port", dxPort.ToString() },
+                                null);
+                        else
+                            LocalServerHelper.TryStartBundledServer("deeplx_windows_amd64.exe");
+                    }
+                    catch
+                    {
+                        // 启动失败不影响引擎选择：翻译时 DeepLXTranslator.EnsureReadyAsync
+                        // 仍会再次尝试，这里静默忽略即可。
+                    }
+                }
             }
         }
 
@@ -347,9 +373,7 @@ namespace CADTransLite.UI
             "DeepL" => "DeepL 神经网络翻译，无需选择模型。",
             "DeepLX" => "DeepL 神经网络翻译（经 DeepLX 代理），无需选择模型。",
             "自定义AI" => "可配置大模型：在下方填写模型名或点击“获取模型”拉取（如 gpt-4o、deepseek-chat）。",
-            "NLLB (本地)" => "本地模型：NLLB-200-Distilled-600M（已随软件打包，离线可用）。",
-            "Argos Translate (本地)" => "本地引擎：基于 Argos 语言包 en/zh/ja/ko/fr/de/es/ru/pt/it，无独立模型选择。",
-            "LibreTranslate (本地)" => "本地引擎：基于 Argos 语言包 en/zh/ja/ko/fr/de/es/ru/pt/it，无独立模型选择。",
+            "Bergamot (本地)" => "纯 .NET 离线引擎（Mozilla Bergamot）：进程内运行、无需 Python、无需启动服务；模型在 tools/bergamot 下，请先运行 tools/setup_bergamot.ps1 安装。",
             _ => string.Empty,
         };
 
@@ -399,10 +423,6 @@ namespace CADTransLite.UI
         // LibreTranslate (本地)
         public bool EnableLibreTranslate { get => _enableLibreTranslate; set { _enableLibreTranslate = value; OnPropertyChanged(); } }
         public string LibreTranslateUrl  { get => _libreTranslateUrl;    set { _libreTranslateUrl    = value; OnPropertyChanged(); } }
-
-        // Argos Translate (本地)
-        public bool EnableArgos { get => _enableArgos; set { _enableArgos = value; OnPropertyChanged(); } }
-        public string ArgosUrl  { get => _argosUrl;    set { _argosUrl    = value; OnPropertyChanged(); } }
 
         // NLLB (本地离线)
         public bool EnableNllb { get => _enableNllb; set { _enableNllb = value; OnPropertyChanged(); } }
@@ -511,18 +531,8 @@ namespace CADTransLite.UI
                 ? System.Windows.Visibility.Visible
                 : System.Windows.Visibility.Collapsed;
 
-        public System.Windows.Visibility LibreTranslateSettingsVisibility =>
-            _selectedProvider == "LibreTranslate (本地)"
-                ? System.Windows.Visibility.Visible
-                : System.Windows.Visibility.Collapsed;
-
-        public System.Windows.Visibility ArgosSettingsVisibility =>
-            _selectedProvider == "Argos Translate (本地)"
-                ? System.Windows.Visibility.Visible
-                : System.Windows.Visibility.Collapsed;
-
-        public System.Windows.Visibility NllbSettingsVisibility =>
-            _selectedProvider == "NLLB (本地)"
+        public System.Windows.Visibility BergamotSettingsVisibility =>
+            _selectedProvider == "Bergamot (本地)"
                 ? System.Windows.Visibility.Visible
                 : System.Windows.Visibility.Collapsed;
 
@@ -734,7 +744,7 @@ namespace CADTransLite.UI
         public IReadOnlyList<string> TranslationProviders { get; } = new[]
         {
             "百度翻译", "腾讯翻译", "Microsoft Translator", "DeepL", "DeepLX",
-            "LibreTranslate (本地)", "Argos Translate (本地)", "NLLB (本地)", "自定义AI",
+            "Bergamot (本地)", "自定义AI",
         };
 
         // ─────────────────────────────────────────────────────────────
@@ -754,8 +764,11 @@ namespace CADTransLite.UI
 
         // 本地翻译服务实时运行状态（供设置面板绑定显示）
         public LocalServiceStatus LibreTranslateService => _libreTranslateService;
-        public LocalServiceStatus ArgosService           => _argosService;
         public LocalServiceStatus NllbService            => _nllbService;
+        public LocalServiceStatus DeepLXService          => _deepLXService;
+        public LocalServiceStatus BergamotService        => _bergamotService;
+        /// <summary>Bergamot 模型目录（只读展示用）。模型由 tools/setup_bergamot.ps1 下载到此处。</summary>
+        public string BergamotModelsPath => System.IO.Path.Combine(System.AppContext.BaseDirectory, "tools", "bergamot");
         public IRelayCommand      SaveSettingsCommand       { get; }
         public IRelayCommand      BrowseOdaPathCommand      { get; }
         public IRelayCommand      OpenOdaDownloadCommand    { get; }
@@ -1714,15 +1727,17 @@ namespace CADTransLite.UI
                 // wrong address" apart from "service is up but still loading its language model".
                 bool? portOpen = null;
                 int probedPort = 0;
-                if (api.Name.Contains("本地"))
+                // 仅「需端口的本地服务」（Python 子进程 / DeepLX 代理）需要探测端口；
+                // Bergamot 是进程内引擎，无端口、无需启动服务，跳过探测。
+                bool needsPortProbe = _selectedProvider is "LibreTranslate (本地)" or "NLLB (本地)" or "DeepLX";
+                if (needsPortProbe)
                 {
-                    string probeUrl = _selectedProvider switch
-                    {
-                        "LibreTranslate (本地)" => _libreTranslateUrl,
-                        "Argos Translate (本地)" => _argosUrl,
-                        "NLLB (本地)" => _nllbUrl,
-                        _ => _deepLXUrl,
-                    };
+                string probeUrl = _selectedProvider switch
+                {
+                    "LibreTranslate (本地)" => _libreTranslateUrl,
+                    "NLLB (本地)" => _nllbUrl,
+                    _ => _deepLXUrl,
+                };
                     if (LocalServerHelper.TryParseHostPort(probeUrl, out var probeHost, out var probePort))
                     {
                         probedPort = probePort;
@@ -1730,18 +1745,21 @@ namespace CADTransLite.UI
                     }
                 }
 
-                // 各引擎首次响应耗时差异极大：
-                //   · NLLB          —— 首次请求要把 600M 模型载入内存，最长 180s；
-                //   · Argos / LibreTranslate —— 首次请求要加载 Argos 语言包 + MiniSBD 分句模型，
-                //                        实测冷启动可达 1–2 分钟，之后每次翻译 <1s，故给 120s；
+                // 各引擎首次响应耗时差异极大（首次翻译要把模型/语言包载入内存，之后每次 <1s）：
+                //   · NLLB          —— 600M 模型载入内存，慢机器可达 3 分钟，给 360s 留足余量；
+                //   · LibreTranslate —— 冷启动加载语言包 + 分句模型，实测可达 1–3 分钟，给 420s；
                 //   · DeepLX        —— 受 DeepL 免费上游 429 限流并指数退避重试，给 30s；
                 //   · 远程接口       —— 20s。
+                // 注意：启动服务时已做一次预热把模型载进内存，正常情况下测试是秒回；
+                // 此处的超时会兜底「用户没等预热完就点测试」或「服务是外部残留的冷实例」。
                 bool isNllb  = api.Name.Contains("NLLB");
                 bool isDeepLX = api.Name.Contains("DeepLX");
-                bool isArgosLike = api.Name.Contains("Argos") || api.Name.Contains("LibreTranslate");
-                int testTimeoutMs = isNllb ? 180000
-                                   : isArgosLike ? 120000
+                bool isLibreLike = api.Name.Contains("LibreTranslate");
+                bool isBergamot = api.Name.Contains("Bergamot");
+                int testTimeoutMs = isNllb ? 360000
+                                   : isLibreLike ? 420000
                                    : isDeepLX ? 30000
+                                   : isBergamot ? 120000
                                    : 20000;
 
                 var translateTask = api.TranslateAsync(testText, srcLang, tgtLang, cancellationToken);
@@ -1771,7 +1789,7 @@ namespace CADTransLite.UI
                         StatusText = $"⚠️ {api.Name} 测试超时：服务已在监听端口 {probedPort}，但 {sec}s 内没有返回结果。" +
                                      "本地引擎首次翻译需要把语言模型载入内存（约 1–3 分钟，仅第一次慢）。" +
                                      "请稍候片刻再点一次「测试」，成功后每次翻译通常 1 秒内完成；若一直超时，请查看 log 目录下的日志。";
-                    else if (api.Name.Contains("本地"))
+                    else if (needsPortProbe)
                         StatusText = $"⚠️ {api.Name} 测试超时：本地服务未在监听端口 {probedPort}。" +
                                      "请先点击该引擎旁的「启动服务」按钮，待状态变为「● 运行中」后再测试。";
                     else
@@ -1801,12 +1819,12 @@ namespace CADTransLite.UI
         }
 
         // ─────────────────────────────────────────────────────────────
-        // 本地服务（LibreTranslate / Argos / NLLB）启动与状态检测
+        // 本地服务（LibreTranslate / NLLB）启动与状态检测
         // ─────────────────────────────────────────────────────────────
 
         /// <summary>
         /// 启动指定本地翻译服务对应的嵌入式 Python 进程（tools/py 下的脚本），并轮询端口直至就绪。
-        /// <paramref name="provider"/> 取值为 "LibreTranslate (本地)" / "Argos Translate (本地)" / "NLLB (本地)"。
+        /// <paramref name="provider"/> 取值为 "LibreTranslate (本地)" / "NLLB (本地)"。
         /// <para>
         /// 注意：这里刻意不接收 <c>CancellationToken</c>。三个「启动服务」按钮共用同一个
         /// <see cref="AsyncRelayCommand{T}"/> 实例，而 CommunityToolkit 在启动新一次执行时会取消上一次的
@@ -1816,11 +1834,19 @@ namespace CADTransLite.UI
         /// </summary>
         private async Task StartLocalServiceAsync(string? provider)
         {
+            // Bergamot 是纯 .NET 进程内引擎：无 Python 子进程、无端口、无需启动服务。
+            // 「启动」在此等价于「检查并加载对应语言对模型」。
+            if (provider == "Bergamot (本地)")
+            {
+                await StartBergamotAsync().ConfigureAwait(false);
+                return;
+            }
+
             LocalServiceStatus? status = provider switch
             {
                 "LibreTranslate (本地)" => _libreTranslateService,
-                "Argos Translate (本地)" => _argosService,
                 "NLLB (本地)" => _nllbService,
+                "DeepLX" => _deepLXService,
                 _ => null,
             };
             if (status is null || provider is null) return;
@@ -1828,8 +1854,8 @@ namespace CADTransLite.UI
             var url = provider switch
             {
                 "LibreTranslate (本地)" => _libreTranslateUrl,
-                "Argos Translate (本地)" => _argosUrl,
                 "NLLB (本地)" => _nllbUrl,
+                "DeepLX" => _deepLXUrl,
                 _ => string.Empty,
             };
             if (!LocalServerHelper.TryParseHostPort(url, out var host, out var port))
@@ -1846,7 +1872,7 @@ namespace CADTransLite.UI
             }
 
             // 端口已监听：可能是本会话服务，也可能是之前残留/不健康的旧实例
-            // （例如离线环境下 Argos 加载失败却仍占着端口）。先尝试停止占用该端口的进程，
+            // （例如离线环境下 LibreTranslate 加载失败却仍占着端口）。先尝试停止占用该端口的进程，
             // 再重新拉起一个干净的健康实例，避免“端口被占却连不上/翻译失败”的怪象。
             if (LocalServerHelper.IsPortOpen(host, port))
             {
@@ -1862,14 +1888,6 @@ namespace CADTransLite.UI
                 // 端口已释放，继续往下走启动逻辑即可（等效于重启）。
             }
 
-            var script = provider switch
-            {
-                "LibreTranslate (本地)" => "libretranslate_server.py",
-                "Argos Translate (本地)" => "argos_server.py",
-                "NLLB (本地)" => "nllb_server.py",
-                _ => string.Empty,
-            };
-
             status.IsBusy = true;
             status.StatusText = "◌ 启动中…";
             status.StatusBrush = Brushes.Orange;
@@ -1877,22 +1895,46 @@ namespace CADTransLite.UI
 
             try
             {
-                var args = new List<string> { script, "--port", port.ToString() };
-                if (provider == "LibreTranslate (本地)")
-                    args.AddRange(new[] { "--host", host });
+                Process? proc;
+                string script = string.Empty;
+                if (provider == "DeepLX")
+                {
+                    // DeepLX 是独立可执行文件，不依赖嵌入式 Python；端口可跟随「API 地址」中的自定义端口。
+                    proc = LocalServerHelper.TryStartBundledServer(
+                        "deeplx_windows_amd64.exe",
+                        new[] { "-port", port.ToString() },
+                        null);
+                }
+                else
+                {
+                    script = provider switch
+                    {
+                        "LibreTranslate (本地)" => "libretranslate_server.py",
+                        "NLLB (本地)" => "nllb_server.py",
+                        _ => string.Empty,
+                    };
 
-                // 复用与翻译器相同的启动逻辑（解析 tools/py/python.exe 并以隐藏窗口拉起）
-                var proc = LocalServerHelper.TryStartBundledServer("python.exe", args.ToArray(), "tools/py");
+                    var args = new List<string> { script, "--port", port.ToString() };
+                    if (provider == "LibreTranslate (本地)")
+                        args.AddRange(new[] { "--host", host });
+
+                    // 复用与翻译器相同的启动逻辑（解析 tools/py/python.exe 并以隐藏窗口拉起）
+                    proc = LocalServerHelper.TryStartBundledServer("python.exe", args.ToArray(), "tools/py");
+                }
+
                 if (proc is null)
                 {
                     status.StatusText = "○ 启动失败";
                     status.StatusBrush = Brushes.Red;
-                    StatusText = $"❌ {provider} 启动失败：未找到嵌入式 Python（tools/py/python.exe）或进程创建被拒绝，" +
-                                 "请确认安装目录完整（详见 log 目录下的日志）。";
+                    StatusText = provider == "DeepLX"
+                        ? $"❌ {provider} 启动失败：未找到 deeplx_windows_amd64.exe（应位于安装目录或 publish 目录）或进程创建被拒绝，" +
+                          "请确认安装目录完整（详见 log 目录下的日志）。"
+                        : $"❌ {provider} 启动失败：未找到嵌入式 Python（tools/py/python.exe）或进程创建被拒绝，" +
+                          "请确认安装目录完整（详见 log 目录下的日志）。";
                     return;
                 }
 
-                // 轮询端口直至就绪。LibreTranslate 启动时会加载全部 Argos 语言包，
+                // 轮询端口直至就绪。LibreTranslate 启动时会加载全部语言包，
                 // NLLB 要载入 600M 模型，实测均可能超过 2 分钟，因此最长等待 240s，
                 // 并在等待期间刷新耗时提示，让用户知道程序没有卡死。
                 var deadline = TimeSpan.FromSeconds(240);
@@ -1922,7 +1964,7 @@ namespace CADTransLite.UI
                     status.StatusText = "● 运行中";
                     status.StatusBrush = Brushes.LimeGreen;
 
-                    // 端口打开 ≠ 可以翻译：Argos/LibreTranslate/NLLB 都是在「第一次翻译请求」时才
+                    // 端口打开 ≠ 可以翻译：LibreTranslate/NLLB 都是在「第一次翻译请求」时才
                     // 加载语言包 / 模型（用户遇到的「端口已监听但测试超时」正是这一段）。
                     // 这里主动发一次极小的预热请求把模型载进内存，之后再点「测试」就是秒回。
                     int portOpenSec = (int)sw.Elapsed.TotalSeconds;
@@ -1934,16 +1976,33 @@ namespace CADTransLite.UI
                     else
                         StatusText = $"✅ {provider} 服务已启动（{portOpenSec}s），但预热请求未成功（{warmErr}）。" +
                                      "首次翻译可能较慢，可稍后再点「测试」。";
+
+                    // 服务已连接并就绪：自动执行一次测试，免去手动点「测试」按钮。
+                    // 上面预热已把模型载入内存，此测试会秒回并在状态栏显示 ✅/❌ 结果。
+                    try
+                    {
+                        StatusText = $"🔍 正在自动测试 {provider} 连接…";
+                        await TestTranslationApiAsync(CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch (Exception autoEx)
+                    {
+                        ErrorLogger.Instance.Warn("LocalServer",
+                            $"{provider} 启动后自动测试异常：{autoEx.Message}");
+                    }
                 }
                 else if (proc.HasExited)
                 {
-                    // 进程直接退出：多半是缺依赖/脚本报错，把 Python 的最后一条 stderr 直接显示出来。
+                    // 进程直接退出：多半是缺依赖/脚本报错，把进程的最后一条 stderr 直接显示出来。
                     var reason = LocalServerHelper.GetLastError(proc.Id);
                     status.StatusText = "○ 启动失败";
                     status.StatusBrush = Brushes.Red;
-                    StatusText = $"❌ {provider} 启动失败：Python 进程已退出（退出码 {proc.ExitCode}）。" +
-                                 (string.IsNullOrWhiteSpace(reason) ? "" : $"错误：{reason} ") +
-                                 $"可先手动运行 tools/py/{script} 查看详情，或执行 tools/py/setup_engines.ps1 安装依赖。";
+                    StatusText = provider == "DeepLX"
+                        ? $"❌ {provider} 启动失败：deeplx_windows_amd64.exe 进程已退出（退出码 {proc.ExitCode}）。" +
+                          (string.IsNullOrWhiteSpace(reason) ? "" : $"错误：{reason} ") +
+                          "请确认该 exe 可独立运行，或查看 log 目录下的日志。"
+                        : $"❌ {provider} 启动失败：Python 进程已退出（退出码 {proc.ExitCode}）。" +
+                          (string.IsNullOrWhiteSpace(reason) ? "" : $"错误：{reason} ") +
+                          $"可先手动运行 tools/py/{script} 查看详情，或执行 tools/py/setup_engines.ps1 安装依赖。";
                 }
                 else
                 {
@@ -1972,13 +2031,69 @@ namespace CADTransLite.UI
             }
         }
 
+        /// <summary>
+        /// 检查 Bergamot 模型是否已安装，并尝试加载当前语言对模型（进程内，无端口 / 无 Python）。
+        /// 结果通过 <see cref="_bergamotService"/> 状态呈现。
+        /// </summary>
+        private async Task StartBergamotAsync()
+        {
+            var status = _bergamotService;
+            if (status.IsBusy) return;
+
+            var src = _sourceLanguage?.GetProviderCode(_selectedProvider) ?? "en";
+            var tgt = _targetLanguage?.GetProviderCode(_selectedProvider) ?? "zh";
+
+            status.IsBusy = true;
+            status.StatusText = "◌ 检查并加载模型中…";
+            status.StatusBrush = Brushes.Orange;
+            StatusText = "正在检查 Bergamot 模型（首次加载需数秒）…";
+
+            try
+            {
+                var api = new CADTransLite.Core.Services.BergamotTranslator(
+                    System.IO.Path.Combine(System.AppContext.BaseDirectory, "tools", "bergamot"));
+                var err = api.WarmUp(src, tgt);
+                if (err is null)
+                {
+                    status.StatusText = "● 模型已就绪（进程内）";
+                    status.StatusBrush = Brushes.Green;
+                    StatusText = "✅ Bergamot 本地引擎已就绪，可直接离线翻译。";
+                }
+                else
+                {
+                    status.StatusText = "○ 模型缺失";
+                    status.StatusBrush = Brushes.Red;
+                    StatusText = $"⚠️ Bergamot 模型未安装：{err} 请运行 tools/setup_bergamot.ps1。";
+                }
+            }
+            catch (Exception ex)
+            {
+                status.StatusText = "○ 加载失败";
+                status.StatusBrush = Brushes.Red;
+                StatusText = $"❌ Bergamot 加载失败：{ex.Message}";
+            }
+            finally
+            {
+                status.IsBusy = false;
+            }
+        }
+
         private async Task PauseLocalServiceAsync(string? provider)
         {
+            // Bergamot 是进程内引擎，没有可停止的外部进程；仅给出提示并复位状态。
+            if (provider == "Bergamot (本地)")
+            {
+                _bergamotService.StatusText = "○ 进程内引擎（无需关闭）";
+                _bergamotService.StatusBrush = Brushes.Gray;
+                StatusText = "ℹ️ Bergamot 为进程内引擎，无需关闭服务。";
+                return;
+            }
+
             LocalServiceStatus? status = provider switch
             {
                 "LibreTranslate (本地)" => _libreTranslateService,
-                "Argos Translate (本地)" => _argosService,
                 "NLLB (本地)" => _nllbService,
+                "DeepLX" => _deepLXService,
                 _ => null,
             };
             if (status is null || provider is null) return;
@@ -1986,8 +2101,8 @@ namespace CADTransLite.UI
             var url = provider switch
             {
                 "LibreTranslate (本地)" => _libreTranslateUrl,
-                "Argos Translate (本地)" => _argosUrl,
                 "NLLB (本地)" => _nllbUrl,
+                "DeepLX" => _deepLXUrl,
                 _ => string.Empty,
             };
             if (!LocalServerHelper.TryParseHostPort(url, out var host, out var port))
@@ -2022,7 +2137,7 @@ namespace CADTransLite.UI
 
         /// <summary>
         /// 向本地服务发送一次极小的翻译请求，把语言包/模型提前载入内存。
-        /// 三个本地引擎（LibreTranslate / Argos / NLLB）使用相同的接口约定：
+        /// 本地引擎（LibreTranslate / NLLB）使用相同的接口约定：
         /// POST /translate { q, source, target, format } → { translatedText }。
         /// </summary>
         /// <returns>(是否成功, 耗时秒数, 失败原因)</returns>
@@ -2059,13 +2174,31 @@ namespace CADTransLite.UI
             try
             {
                 ProbeService(_libreTranslateUrl, _libreTranslateService);
-                ProbeService(_argosUrl, _argosService);
                 ProbeService(_nllbUrl, _nllbService);
+                ProbeService(_deepLXUrl, _deepLXService);
             }
             finally
             {
                 _localServiceMonitor?.Start();
             }
+        }
+
+        /// <summary>
+        /// 停止后台端口轮询定时器。必须在应用程序退出/窗口关闭时调用，否则退出阶段定时器仍会
+        /// 触发 <see cref="ProbeService"/> 的 socket 探测，在进程退出时被中止而产生「未观察 Task 异常」噪声。
+        /// </summary>
+        public void StopMonitoring()
+        {
+            try { _localServiceMonitor?.Stop(); }
+            catch { /* ignore */ }
+            try { _localServiceMonitor?.Dispose(); }
+            catch { /* ignore */ }
+        }
+
+        public void Dispose()
+        {
+            StopMonitoring();
+            GC.SuppressFinalize(this);
         }
 
         /// <summary>
@@ -2295,8 +2428,6 @@ namespace CADTransLite.UI
                 DeepLXUrl               = _deepLXUrl,
                 EnableLibreTranslate    = _enableLibreTranslate,
                 LibreTranslateUrl       = _libreTranslateUrl,
-                EnableArgos             = _enableArgos,
-                ArgosUrl                = _argosUrl,
                 EnableNllb              = _enableNllb,
                 NllbUrl                 = _nllbUrl,
                 EnableDeepL             = _enableDeepL,
@@ -2346,8 +2477,6 @@ namespace CADTransLite.UI
                 _deepLXUrl                = api.DeepLXUrl;
                 _enableLibreTranslate     = api.EnableLibreTranslate;
                 _libreTranslateUrl        = api.LibreTranslateUrl;
-                _enableArgos              = api.EnableArgos;
-                _argosUrl                 = api.ArgosUrl;
                 _enableNllb               = api.EnableNllb;
                 _nllbUrl                  = api.NllbUrl;
             _enableDeepL              = api.EnableDeepL;
@@ -2456,20 +2585,10 @@ namespace CADTransLite.UI
                         throw new InvalidOperationException("DeepLX URL 不能为空。");
                     return new DeepLXTranslator(new TranslationApiConfig { BaseUrl = _deepLXUrl });
 
-                case "LibreTranslate (本地)":
-                    if (string.IsNullOrWhiteSpace(_libreTranslateUrl))
-                        throw new InvalidOperationException("LibreTranslate URL 不能为空。");
-                    return new LibreTranslateTranslator(new TranslationApiConfig { BaseUrl = _libreTranslateUrl });
-
-                case "Argos Translate (本地)":
-                    if (string.IsNullOrWhiteSpace(_argosUrl))
-                        throw new InvalidOperationException("Argos Translate URL 不能为空。");
-                    return new ArgosTranslateTranslator(new TranslationApiConfig { BaseUrl = _argosUrl });
-
-                case "NLLB (本地)":
-                    if (string.IsNullOrWhiteSpace(_nllbUrl))
-                        throw new InvalidOperationException("NLLB URL 不能为空。");
-                    return new NllbTranslator(new TranslationApiConfig { BaseUrl = _nllbUrl });
+                case "Bergamot (本地)":
+                    // 纯 .NET 离线引擎：进程内运行，模型在 tools/bergamot 下，无需 URL / Python。
+                    return new CADTransLite.Core.Services.BergamotTranslator(
+                        System.IO.Path.Combine(System.AppContext.BaseDirectory, "tools", "bergamot"));
 
                 default:
                     return null;

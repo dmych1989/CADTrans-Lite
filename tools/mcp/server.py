@@ -13,7 +13,7 @@
 #   CADTRANS_BRIDGE_HOST  桥接服务地址（默认 127.0.0.1）
 #   CADTRANS_BRIDGE_PORT  桥接服务端口（默认 8090）
 #   CADTRANS_BRIDGE_EXE   可选：C# 桥接 exe 路径，若设置且连接失败会自动拉起
-#   CADTRANS_AUTO_ARGOS   设为 1 时自动启动本地 Argos 翻译服务（tools/py/argos_server.py）
+#   CADTRANS_AUTO_LIBRE   设为 1 时自动启动本地 LibreTranslate 翻译服务（tools/py/libretranslate_server.py）
 #   CADTRANS_PY_DIR       可选：指定 tools/py 目录（默认从本文件向上定位）
 #   CADTRANS_MCP_LOG      可选：日志文件路径（默认打到 stderr）
 
@@ -33,11 +33,11 @@ sys.path.insert(0, str(HERE))
 HOST = os.environ.get("CADTRANS_BRIDGE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("CADTRANS_BRIDGE_PORT", "8090"))
 BRIDGE_EXE = os.environ.get("CADTRANS_BRIDGE_EXE", "")
-AUTO_ARGOS = os.environ.get("CADTRANS_AUTO_ARGOS", "") == "1"
+AUTO_LIBRE = os.environ.get("CADTRANS_AUTO_LIBRE", "") == "1"
 PY_DIR = os.environ.get("CADTRANS_PY_DIR", str(REPO_ROOT / "tools" / "py"))
 
 _bridge_proc = None
-_argos_proc = None
+_libre_proc = None
 
 
 def log(msg: str) -> None:
@@ -45,41 +45,41 @@ def log(msg: str) -> None:
     print(f"[cadtrans-mcp] {msg}", file=sys.stderr, flush=True)
 
 
-# ---- 本地 Argos 翻译服务（可选自动拉起） ----------------------------------
-def ensure_argos():
-    if not AUTO_ARGOS:
+# ---- 本地 LibreTranslate 翻译服务（可选自动拉起） -------------------------
+def ensure_libretranslate():
+    if not AUTO_LIBRE:
         return
-    argos_py = Path(PY_DIR) / "argos_server.py"
-    if not argos_py.exists():
-        log(f"未找到 argos_server.py: {argos_py}")
+    libre_py = Path(PY_DIR) / "libretranslate_server.py"
+    if not libre_py.exists():
+        log(f"未找到 libretranslate_server.py: {libre_py}")
         return
-    global _argos_proc
-    if _argos_proc is not None and _argos_proc.poll() is None:
+    global _libre_proc
+    if _libre_proc is not None and _libre_proc.poll() is None:
         return
     try:
-        log(f"启动本地 Argos 翻译服务: {argos_py}")
+        log(f"启动本地 LibreTranslate 翻译服务: {libre_py}")
         # 用仓库自带的可嵌入 python（如存在）否则用系统 python
         py_exe = "python.exe" if (Path(PY_DIR) / "python.exe").exists() else "python"
-        _argos_proc = subprocess.Popen(
-            [py_exe, str(argos_py)],
+        _libre_proc = subprocess.Popen(
+            [py_exe, str(libre_py)],
             cwd=str(PY_DIR),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         # 等待服务就绪（最多 150s，首启加载模型较慢）
         for _ in range(150):
-            if _probe_argos():
-                log("Argos 已就绪")
+            if _probe_libretranslate():
+                log("LibreTranslate 已就绪")
                 return
             time.sleep(1)
-        log("等待 Argos 就绪超时（仍将继续，翻译可能失败）")
+        log("等待 LibreTranslate 就绪超时（仍将继续，翻译可能失败）")
     except Exception as e:  # noqa: BLE001
-        log(f"启动 Argos 失败: {e}")
+        log(f"启动 LibreTranslate 失败: {e}")
 
 
-def _probe_argos() -> bool:
+def _probe_libretranslate() -> bool:
     try:
-        with socket.create_connection((HOST, 5001), timeout=1):
+        with socket.create_connection((HOST, 5000), timeout=1):
             return True
     except OSError:
         return False
@@ -132,7 +132,7 @@ def send_command(command: str, params: dict, timeout: float = 180.0) -> dict | N
 
 def call(command: str, params: dict, timeout: float = 180.0) -> dict:
     """调用桥接命令并统一处理 success/error，失败抛出 RuntimeError。"""
-    ensure_argos()
+    ensure_libretranslate()
     ensure_bridge()
     resp = send_command(command, params, timeout)
     if resp is None:
@@ -163,15 +163,15 @@ def list_engines() -> str:
 
 
 @mcp.tool()
-def list_language_pairs(argos_url: str = "http://127.0.0.1:5001") -> str:
-    """查询本地 Argos 翻译服务已安装的可用语言对数量（需要 Argos 服务已启动）。"""
-    data = call("list_language_pairs", {"argos_url": argos_url})
+def list_language_pairs(libre_url: str = "http://127.0.0.1:5000") -> str:
+    """查询本地 LibreTranslate 翻译服务的就绪状态（需要 LibreTranslate 服务已启动）。"""
+    data = call("get_status", {})
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
 def get_status() -> str:
-    """返回桥接服务与本地 Argos 服务的就绪状态。"""
+    """返回桥接服务与本地 LibreTranslate 服务的就绪状态。"""
     data = call("get_status", {})
     return json.dumps(data, ensure_ascii=False, indent=2)
 
@@ -181,7 +181,7 @@ def translate_text(
     text: str,
     source: str = "en",
     target: str = "zh",
-    engine: str = "Argos Translate (本地)",
+    engine: str = "Bergamot (本地)",
 ) -> str:
     """翻译一段纯文本。参数：text 待翻译文本；source/target 语言代码(en,zh,ja,ko...);
     engine 翻译引擎名（见 list_engines）。"""
@@ -224,7 +224,7 @@ def translate_drawing(
     file_path: str,
     source: str = "en",
     target: str = "zh",
-    engine: str = "Argos Translate (本地)",
+    engine: str = "Bergamot (本地)",
     enable_layout_adjust: bool = True,
     oda_path: str = "",
 ) -> str:

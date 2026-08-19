@@ -33,9 +33,26 @@ public sealed class ExcelFormatConfig
     public bool IsHidden { get; init; }
 
     /// <summary>
+    /// 去重组“全部句柄”列（隐藏）。
+    /// 相同文本去重后在 Excel 只占一行，id 列只写首个句柄；
+    /// 本列用 ';' 连接该组所有句柄（如 "h1;h2;h3"），使跨会话/独立导入回填时
+    /// 仍能还原其余相同文本实例，避免“同样的文字只替换了一个”。
+    /// </summary>
+    public static ExcelFormatConfig ColAllHandles { get; } = new()
+    {
+        ColumnIndex = 4,
+        HeaderText = "全部句柄",
+        Width = 24,
+        IsMetadata = true,
+        IsEditable = false,
+        IsHidden = true,
+    };
+
+    /// <summary>
     /// Full list of column configurations for the rich format.
-    /// 列清洗后仅保留 3 列：id / 原文 / 翻译（与历史 _all.xlsx 数据表布局一致）。
-    /// 其余 9 列（Handle/类型/图层/块名/属性标签/表格位置/清洗文本/状态/备注）
+    /// 列清洗后仅保留 3 列：id / 原文 / 翻译（与历史 _all.xlsx 数据表布局一致），
+    /// 另加一个隐藏列“全部句柄”用于保存去重组的所有句柄（见 ColAllHandles）。
+    /// 其余 9 列（类型/图层/块名/属性标签/表格位置/清洗文本/状态/备注）
     /// 不再导出——直接从文件中删除而非隐藏。
     /// </summary>
     public static readonly IReadOnlyList<ExcelFormatConfig> RichColumns = new List<ExcelFormatConfig>
@@ -43,5 +60,6 @@ public sealed class ExcelFormatConfig
         new() { ColumnIndex = 1, HeaderText = "id",   Width = 24, IsMetadata = true,  IsEditable = false, IsHidden = false },
         new() { ColumnIndex = 2, HeaderText = "原文", Width = 60, IsMetadata = false, IsEditable = true,  IsHidden = false },
         new() { ColumnIndex = 3, HeaderText = "翻译", Width = 60, IsMetadata = false, IsEditable = true,  IsHidden = false },
+        new() { ColumnIndex = 4, HeaderText = "全部句柄", Width = 24, IsMetadata = true, IsEditable = false, IsHidden = true },
     };
 }

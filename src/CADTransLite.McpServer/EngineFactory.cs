@@ -12,9 +12,7 @@ internal static class EngineFactory
 {
     public static readonly List<string> EngineNames = new()
     {
-        "Argos Translate (本地)",
-        "LibreTranslate (本地)",
-        "NLLB (本地)",
+        "Bergamot (本地)",
         "DeepLX",
         "自定义AI",
         "百度翻译",
@@ -26,7 +24,6 @@ internal static class EngineFactory
     /// <summary>Default base URLs for the local HTTP engines.</summary>
     public static readonly Dictionary<string, string> LocalDefaults = new()
     {
-        ["argos_url"] = "http://127.0.0.1:5001",
         ["libre_url"] = "http://127.0.0.1:5000",
         ["nllb_url"] = "http://127.0.0.1:5002",
         ["deeplx_url"] = "http://127.0.0.1:1188"
@@ -36,21 +33,11 @@ internal static class EngineFactory
     {
         switch (engine)
         {
-            case "Argos Translate (本地)":
-                return new ArgosTranslateTranslator(new TranslationApiConfig
-                {
-                    BaseUrl = Cfg(cfg, "argos_url", LocalDefaults["argos_url"])
-                });
-            case "LibreTranslate (本地)":
-                return new LibreTranslateTranslator(new TranslationApiConfig
-                {
-                    BaseUrl = Cfg(cfg, "libre_url", LocalDefaults["libre_url"])
-                });
-            case "NLLB (本地)":
-                return new NllbTranslator(new TranslationApiConfig
-                {
-                    BaseUrl = Cfg(cfg, "nllb_url", LocalDefaults["nllb_url"])
-                });
+            case "Bergamot (本地)":
+                // 纯 .NET 离线引擎：进程内运行 bergamot 原生库，模型在 tools/bergamot 下。
+                // 无需 Python、无需启动子进程或 HTTP 服务。
+                return new BergamotTranslator(Cfg(cfg, "bergamot_models",
+                    Path.Combine(AppContext.BaseDirectory, "tools", "bergamot")));
             case "DeepLX":
                 return new DeepLXTranslator(new TranslationApiConfig
                 {

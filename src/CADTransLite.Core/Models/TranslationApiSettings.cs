@@ -143,21 +143,6 @@ public sealed class TranslationApiSettings
     public string LibreTranslateUrl { get; set; } = "http://127.0.0.1:5000";
 
     // ────────────────────────────────────────────────────────────────
-    // Argos Translate (Local Python service) Settings
-    // ────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Whether to use Argos Translate (local Python service) for translation.
-    /// </summary>
-    public bool EnableArgos { get; set; } = false;
-
-    /// <summary>
-    /// Argos Translate service URL (the bundled python http server).
-    /// Default: http://127.0.0.1:5001
-    /// </summary>
-    public string ArgosUrl { get; set; } = "http://127.0.0.1:5001";
-
-    // ────────────────────────────────────────────────────────────────
     // NLLB (本地离线) Settings — 集成 RTranslator 的 NLLB-Distilled-600M 离线翻译模型
     // ────────────────────────────────────────────────────────────────
 

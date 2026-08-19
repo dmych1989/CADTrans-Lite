@@ -106,8 +106,8 @@ public static class LocalServerHelper
     /// <summary>
     /// Attempts to launch a bundled server executable, passing <paramref name="args"/> on the
     /// command line and (optionally) looking inside <paramref name="subDirectory"/> of each
-    /// candidate directory. Used for the Argos Translate engine, which launches
-    /// <c>python.exe argos_server.py --port 5001</c> from the bundled <c>tools/py</c> folder.
+    /// candidate directory. Used for the LibreTranslate / NLLB local engines, which launch
+    /// <c>python.exe libretranslate_server.py</c> / <c>nllb_server.py</c> from the bundled <c>tools/py</c> folder.
     /// </summary>
     /// <param name="exeName">File name to look for, e.g. "python.exe".</param>
     /// <param name="args">Optional command-line arguments for the executable.</param>
@@ -142,7 +142,7 @@ public static class LocalServerHelper
                 var psi = new ProcessStartInfo
                 {
                     FileName = full,
-                    // 必须设为 false 才能使用 EnvironmentVariables（为 Argos/LibreTranslate 注入
+                    // 必须设为 false 才能使用 EnvironmentVariables（为 LibreTranslate/NLLB 注入
                     // ARGOS_PACKAGES_DIR 等离线环境变量）；同时配合 CreateNoWindow 隐藏控制台窗口。
                     UseShellExecute = false,
                     CreateNoWindow = true,
@@ -153,11 +153,11 @@ public static class LocalServerHelper
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8,
                 };
-                // Run from the exe's own directory so relative script/arg paths (e.g. argos_server.py)
+                // Run from the exe's own directory so relative script/arg paths (e.g. libretranslate_server.py)
                 // resolve correctly.
                 psi.WorkingDirectory = Path.GetDirectoryName(full) ?? dir;
 
-                // Point Argos Translate / LibreTranslate at the bundled language packs so they
+                // Point LibreTranslate / NLLB at the bundled language packs so they
                 // load offline and never re-download models at runtime.
                 var argosPkgs = Path.Combine(psi.WorkingDirectory, "argos_packages");
                 psi.EnvironmentVariables["ARGOS_PACKAGES_DIR"] = argosPkgs;
@@ -165,13 +165,18 @@ public static class LocalServerHelper
                 // 使用 argostranslate 默认的句子分句器（基于标点，完全离线）。
                 // 注：此前注入的 ARGOS_CHUNK_TYPE=MINISBD 需要联网下载 MiniSBD 的
                 // 中文/日/韩/俄文 ONNX 模型，离线环境下会导致除 en->zh 外的方向全部
-                // 挂起/超时/500。改为去掉该变量；argos_server.py 也会强制清除它，
+                // 挂起/超时/500。改为去掉该变量；libretranslate_server.py 也会强制清除它，
                 // 双重保险确保离线翻译可用。
                 psi.EnvironmentVariables["XDG_DATA_HOME"] = psi.WorkingDirectory;
 
                 // 让 Python 以 UTF-8 且不缓冲地输出，否则重定向后中文乱码、日志也会延迟很久才出现。
                 psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
                 psi.EnvironmentVariables["PYTHONUNBUFFERED"] = "1";
+                // 强制 Python 解释器以 UTF-8 模式运行（PEP 540）。这对 LibreTranslate 尤为关键：
+                // 其 Flask jsonify 在 Windows 非 UTF-8 locale 下会把中文编码成乱码（如“哈啰”→“åå°”），
+                // 导致 UI 拿到的是乱码译文而非异常，用户误以为“引擎不能用”。注入此变量后 Flask
+                // 与所有 stdlib 文本处理均按 UTF-8 进行，根治本地引擎中文乱码（LibreTranslate/NLLB 一并受益）。
+                psi.EnvironmentVariables["PYTHONUTF8"] = "1";
 
                 if (args is { Length: > 0 })
                     psi.Arguments = string.Join(" ", args.Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
@@ -355,7 +360,7 @@ public static class LocalServerHelper
 
     /// <summary>
     /// 探测指定地址是否为一个“健康的本应用翻译服务”。优先使用轻量的 <c>/ready</c> 端点
-    /// （Argos 新版支持；返回 <c>{ ready: true }</c> 即视为就绪）；若该端点不可用，则退化为
+    /// （本地引擎支持；返回 <c>{ ready: true }</c> 即视为就绪）；若该端点不可用，则退化为
     /// 一次真实翻译探测（en→zh），非空译文即视为健康。两者皆失败时返回 <c>false</c>，
     /// 调用方可据此判定该端口被非本应用/不健康的进程占用。
     /// </summary>
@@ -458,6 +463,35 @@ public static class LocalServerHelper
     }
 
     /// <summary>
+    /// 决定翻译适配器是否应「启动/重启」一个干净的服务实例，而不是盲目复用现有端口占用者。
+    /// 逻辑：
+    ///   1) 端口未开放 → 返回 <c>true</c>（需要启动新实例）。
+    ///   2) 端口被「本应用会话」启动的进程占用 → 返回 <c>false</c>（直接复用；其首次模型加载
+    ///      由真实翻译请求的长超时覆盖，不应杀掉重启，否则会让加载中的实例从头开始、永远就绪不了）。
+    ///   3) 端口被「非本会话」进程占用（如上次调试/测试遗留的坏实例、其它会话启动的实例）→
+    ///      先清理占用者再返回 <c>true</c>，调用方会拉起一个干净实例。这正是「测试多次仍失败」
+    ///      的根因修复：此前只要端口开着就永远复用坏实例，导致 NLLB 500 空译文反复出现。
+    /// <para>
+    /// 注意：不依赖「健康检查」来判定是否重启，避免误杀「正在冷加载模型」的健康实例
+    /// （冷加载期间真实探测会超时，但实例其实可用，杀掉反而让它从头开始永远就绪不了）。
+    /// </para>
+    /// </summary>
+    public static bool ShouldStartFreshServer(string host, int port)
+    {
+        if (!IsPortOpen(host, port))
+            return true;
+
+        if (IsPortOwnedByUs(host, port))
+            return false;
+
+        // 非本会话进程占用（很可能是上次调试/测试遗留的坏实例）→ 清理，交回给调用方拉起干净实例。
+        ErrorLogger.Instance.Info("LocalServer",
+            $"端口 {port} 被非本会话进程占用，将清理后由本应用重启干净实例。");
+        StopServerOnPort(host, port);
+        return true;
+    }
+
+    /// <summary>
     /// 判断占用指定端口的进程是否为本应用会话启动的（在 _ownedProcesses 中）。
     /// 翻译路径据此判断：若端口被“非本会话”的进程占用（如上次调试遗留的坏实例），
     /// 应当先清理再重新拉起干净实例，而不是盲目复用坏服务。
@@ -484,9 +518,13 @@ public static class LocalServerHelper
                 if (parts.Length >= 5
                     && parts[1].EndsWith(":" + port)
                     && parts[3] == "LISTENING"
-                && int.TryParse(parts[4], out var pid)
-                && pid > 0)
+                    && int.TryParse(parts[4], out var pid)
+                    && pid > 0)
                 {
+                    // 只要本会话进程持有该端口（任一监听 PID 属于我们）即视为“我们的服务”。
+                    // 不能遇到第一个非本会话 PID 就 return false：并发竞态/端口复用可能让
+                    // netstat 同时列出多个进程，误判会把健康的本会话实例连同一起杀掉重启，
+                    // 造成 NLLB 服务反复崩溃（ExitCode=-1）从而“测试失败”。
                     foreach (var owned in _ownedProcesses)
                     {
                         try
@@ -496,7 +534,6 @@ public static class LocalServerHelper
                         }
                         catch { /* 进程已失效 */ }
                     }
-                    return false;
                 }
             }
         }

@@ -27,6 +27,10 @@
     
     <!-- System.Drawing.Common - Image processing (matching EPPlus.System.Drawing 7.5.0 dependency) -->
     <PackageReference Include="System.Drawing.Common" Version="8.0.4" />
+
+    <!-- BergamotTranslatorSharp - 纯 .NET 离线翻译引擎（C# 封装 + 原生 DLL，无 Python 依赖）。
+         模型来自 Mozilla 注册表，进程内运行（BlockingService），参见 tools/setup_bergamot.ps1。 -->
+    <PackageReference Include="BergamotTranslatorSharp" Version="0.5.1" />
   </ItemGroup>
 
 </Project>

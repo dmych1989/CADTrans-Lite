@@ -30,6 +30,16 @@ public partial class MainWindow : Window
     }
 
     // -----------------------------------------------------------------------
+    // Log viewer
+    // -----------------------------------------------------------------------
+
+    private void BtnViewLog_Click(object sender, RoutedEventArgs e)
+    {
+        var win = new LogViewerWindow { Owner = this };
+        win.Show();
+    }
+
+    // -----------------------------------------------------------------------
     // Drag-and-Drop handlers
     // -----------------------------------------------------------------------
 

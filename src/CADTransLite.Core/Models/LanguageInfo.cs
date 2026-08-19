@@ -76,8 +76,9 @@ public static class SupportedLanguages
     /// <remarks>
     /// - DeepL / DeepLX cover the major languages in the catalog
     ///   (zh/en/ru/es/pt/fr/ko/ja/de); they do not support Arabic.
-    /// - The bundled local Argos / LibreTranslate packages cover
-    ///   (en ⇄ zh/ja/ko/fr/de/es/ru/pt/ar).
+    /// - The bundled local Bergamot engine (纯 .NET，无 Python) ships en ⇄ * and * ⇄ en
+    ///   models, covering any pairwise translation among
+    ///   (zh/en/ja/ko/fr/de/es/ru/pt/ar).
     /// - NLLB-200, Baidu, Tencent, Microsoft and 自定义AI cover all catalog languages
     ///   (including Ukrainian).
     /// </remarks>
@@ -85,8 +86,7 @@ public static class SupportedLanguages
     {
         ["DeepL"] = new(StringComparer.OrdinalIgnoreCase) { "ZH", "EN", "RU", "ES", "PT", "FR", "KO", "JA", "DE" },
         ["DeepLX"] = new(StringComparer.OrdinalIgnoreCase) { "ZH", "EN", "RU", "ES", "PT", "FR", "KO", "JA", "DE" },
-        ["Argos Translate (本地)"] = new(StringComparer.OrdinalIgnoreCase) { "ZH", "EN", "RU", "ES", "PT", "FR", "KO", "JA", "AR", "DE" },
-        ["LibreTranslate (本地)"] = new(StringComparer.OrdinalIgnoreCase) { "ZH", "EN", "RU", "ES", "PT", "FR", "KO", "JA", "AR", "DE" },
+        ["Bergamot (本地)"] = new(StringComparer.OrdinalIgnoreCase) { "ZH", "EN", "RU", "ES", "PT", "FR", "KO", "JA", "AR", "DE" },
     };
 
     /// <summary>

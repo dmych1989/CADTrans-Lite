@@ -18,7 +18,7 @@ def send(cmd, params=None, timeout=10.0):
 for cmd, params in [
     ("list_engines", {}),
     ("get_status", {}),
-    ("translate_text", {"text": "Hello world", "source": "en", "target": "zh", "engine": "Argos Translate (本地)"}),
+    ("translate_text", {"text": "Hello world", "source": "en", "target": "zh", "engine": "Bergamot (本地)"}),
 ]:
     try:
         r = send(cmd, params)
