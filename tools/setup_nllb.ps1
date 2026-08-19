@@ -1,4 +1,4 @@
-# tools/setup_nllb.ps1
+﻿# tools/setup_nllb.ps1
 # Provisions the NLLB (local) translation engine for CADTrans Lite and PRE-DOWNLOADS the
 # NLLB-200-Distilled-600M model into the repo so the app never fetches it from HuggingFace
 # at runtime.

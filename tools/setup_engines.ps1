@@ -1,4 +1,4 @@
-# tools/py/setup_engines.ps1
+﻿# tools/py/setup_engines.ps1
 # Provisions the Argos Translate (local) and LibreTranslate (local) engines for CADTrans Lite and
 # BUNDLES their language packs + MiniSBD sentence-splitter models into the repo so the app never
 # downloads anything at runtime.

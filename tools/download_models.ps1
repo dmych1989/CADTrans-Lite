@@ -1,4 +1,4 @@
-# tools/download_models.ps1
+﻿# tools/download_models.ps1
 # Download selected Argos Translate offline translation models (.argosmodel) for CADTrans Lite.
 #
 # Unlike tools/py/setup_engines.ps1 (which hard-codes 9 language pairs, ~2GB), this script lists

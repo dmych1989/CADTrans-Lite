@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 # Self-contained publish for CADTrans Lite (no .NET runtime needed on the user's PC).
 # Bundles the .NET 9 runtime into publish/ via the Release self-contained config in

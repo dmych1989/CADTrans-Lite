@@ -1,4 +1,4 @@
-# tools/package_models.ps1
+﻿# tools/package_models.ps1
 # Download Argos Translate models and package EACH one into its own .zip, so users can grab only
 # the language pairs they need and drop them into the app's argos_packages folder.
 #
