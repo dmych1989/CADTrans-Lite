@@ -333,6 +333,8 @@ namespace CADTransLite.UI
                 OnPropertyChanged(nameof(DeepLSettingsVisibility));
                 OnPropertyChanged(nameof(DeepLXSettingsVisibility));
                 OnPropertyChanged(nameof(BergamotSettingsVisibility));
+                OnPropertyChanged(nameof(LibreTranslateSettingsVisibility));
+                OnPropertyChanged(nameof(NllbSettingsVisibility));
                 OnPropertyChanged(nameof(CustomAISettingsVisibility));
                 OnPropertyChanged(nameof(SupportedModelsText));
                 UpdateLanguageLists();
@@ -374,6 +376,8 @@ namespace CADTransLite.UI
             "DeepLX" => "DeepL 神经网络翻译（经 DeepLX 代理），无需选择模型。",
             "自定义AI" => "可配置大模型：在下方填写模型名或点击“获取模型”拉取（如 gpt-4o、deepseek-chat）。",
             "Bergamot (本地)" => "纯 .NET 离线引擎（Mozilla Bergamot）：进程内运行、无需 Python、无需启动服务；模型在 tools/bergamot 下，请先运行 tools/setup_bergamot.ps1 安装。",
+            "LibreTranslate (本地)" => "LibreTranslate 本地服务（基于 Argos 模型，需 Python 运行时与语言包）：点“启动服务”拉起 tools/py 下的本地服务，模型在 tools/py/argos_packages 下（setup_engines.ps1 已安装）。",
+            "NLLB (本地)" => "NLLB-200 本地神经翻译（Meta，需 Python 运行时）：点“启动服务”拉起 tools/py 下的本地服务，模型在 tools/py/models/nllb-200-distilled-600M（setup_nllb.ps1 已安装）。",
             _ => string.Empty,
         };
 
@@ -533,6 +537,16 @@ namespace CADTransLite.UI
 
         public System.Windows.Visibility BergamotSettingsVisibility =>
             _selectedProvider == "Bergamot (本地)"
+                ? System.Windows.Visibility.Visible
+                : System.Windows.Visibility.Collapsed;
+
+        public System.Windows.Visibility LibreTranslateSettingsVisibility =>
+            _selectedProvider == "LibreTranslate (本地)"
+                ? System.Windows.Visibility.Visible
+                : System.Windows.Visibility.Collapsed;
+
+        public System.Windows.Visibility NllbSettingsVisibility =>
+            _selectedProvider == "NLLB (本地)"
                 ? System.Windows.Visibility.Visible
                 : System.Windows.Visibility.Collapsed;
 
@@ -744,7 +758,7 @@ namespace CADTransLite.UI
         public IReadOnlyList<string> TranslationProviders { get; } = new[]
         {
             "百度翻译", "腾讯翻译", "Microsoft Translator", "DeepL", "DeepLX",
-            "Bergamot (本地)", "自定义AI",
+            "Bergamot (本地)", "LibreTranslate (本地)", "NLLB (本地)", "自定义AI",
         };
 
         // ─────────────────────────────────────────────────────────────
@@ -2589,6 +2603,18 @@ namespace CADTransLite.UI
                     // 纯 .NET 离线引擎：进程内运行，模型在 tools/bergamot 下，无需 URL / Python。
                     return new CADTransLite.Core.Services.BergamotTranslator(
                         System.IO.Path.Combine(System.AppContext.BaseDirectory, "tools", "bergamot"));
+
+                case "LibreTranslate (本地)":
+                    if (string.IsNullOrWhiteSpace(_libreTranslateUrl))
+                        throw new InvalidOperationException("LibreTranslate URL 不能为空。");
+                    return new CADTransLite.Core.Services.LibreTranslateTranslator(
+                        new CADTransLite.Core.Interfaces.TranslationApiConfig { BaseUrl = _libreTranslateUrl });
+
+                case "NLLB (本地)":
+                    if (string.IsNullOrWhiteSpace(_nllbUrl))
+                        throw new InvalidOperationException("NLLB URL 不能为空。");
+                    return new CADTransLite.Core.Services.NllbTranslator(
+                        new CADTransLite.Core.Interfaces.TranslationApiConfig { BaseUrl = _nllbUrl });
 
                 default:
                     return null;

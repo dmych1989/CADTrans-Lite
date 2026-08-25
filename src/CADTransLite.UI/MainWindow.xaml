@@ -664,6 +664,114 @@
                                                FontSize="10" Foreground="#475569" Margin="0,4,0,0" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
+
+                            <!-- LibreTranslate (本地) -->
+                            <Border Style="{DynamicResource EngineCardStyle}"
+                                    BorderThickness="4,1,1,1"
+                                    BorderBrush="{DynamicResource EngineLibre}"
+                                    Visibility="{Binding LibreTranslateSettingsVisibility}">
+                                <StackPanel>
+                                    <TextBlock Text="LibreTranslate（本地 · Argos 模型）"
+                                               FontWeight="Bold" FontSize="13" Margin="0,0,0,4" />
+                                    <TextBlock Text="基于 Argos 模型的本地翻译服务，需要 Python 运行时与语言包（tools/py/argos_packages）。点击「启动服务」拉起 tools/py 下的 LibreTranslate 本地服务。"
+                                               FontSize="11" Foreground="#475569" TextWrapping="Wrap" />
+                                    <TextBox Text="{Binding LibreTranslateUrl, UpdateSourceTrigger=PropertyChanged}"
+                                             FontSize="11" Margin="0,4,0,6"
+                                             Style="{DynamicResource SettingTextBoxStyle}" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Ellipse Width="10" Height="10"
+                                                     Fill="{Binding LibreTranslateService.StatusBrush}"
+                                                     Margin="0,0,6,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding LibreTranslateService.StatusText}"
+                                                       FontSize="11" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                            <Button Content="启动服务"
+                                                    Command="{Binding StartLocalServiceCommand}"
+                                                    CommandParameter="LibreTranslate (本地)"
+                                                    Style="{DynamicResource BrowseButtonStyle}"
+                                                    Padding="10,6"
+                                                    Margin="0,0,6,0"
+                                                    ToolTip="启动 LibreTranslate 本地服务（Python）" />
+                                            <Button Content="关闭服务"
+                                                    Command="{Binding PauseLocalServiceCommand}"
+                                                    CommandParameter="LibreTranslate (本地)"
+                                                    Style="{DynamicResource BrowseButtonStyle}"
+                                                    Padding="10,6"
+                                                    Margin="0,0,6,0"
+                                                    ToolTip="关闭 LibreTranslate 本地服务" />
+                                            <Button Content="测试"
+                                                    Command="{Binding TestTranslationApiCommand}"
+                                                    CommandParameter="LibreTranslate (本地)"
+                                                    Style="{DynamicResource BrowseButtonStyle}"
+                                                    Padding="10,6"
+                                                    ToolTip="测试 LibreTranslate 本地翻译连接" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="提示: 本地服务首次加载模型较慢（CPU 推理，一句中文可能需要数十秒），服务内置单次请求 600s 超时。请确保已运行 tools/setup_engines.ps1 安装语言包。"
+                                               FontSize="10" Foreground="#475569" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- NLLB (本地) -->
+                            <Border Style="{DynamicResource EngineCardStyle}"
+                                    BorderThickness="4,1,1,1"
+                                    BorderBrush="{DynamicResource EngineNllb}"
+                                    Visibility="{Binding NllbSettingsVisibility}">
+                                <StackPanel>
+                                    <TextBlock Text="NLLB-200（本地 · Meta 神经翻译）"
+                                               FontWeight="Bold" FontSize="13" Margin="0,0,0,4" />
+                                    <TextBlock Text="基于 Meta NLLB-200 蒸馏模型的本地翻译服务，需要 Python 运行时（tools/py/models/nllb-200-distilled-600M）。点击「启动服务」拉起 tools/py 下的 NLLB 本地服务。"
+                                               FontSize="11" Foreground="#475569" TextWrapping="Wrap" />
+                                    <TextBox Text="{Binding NllbUrl, UpdateSourceTrigger=PropertyChanged}"
+                                             FontSize="11" Margin="0,4,0,6"
+                                             Style="{DynamicResource SettingTextBoxStyle}" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Ellipse Width="10" Height="10"
+                                                     Fill="{Binding NllbService.StatusBrush}"
+                                                     Margin="0,0,6,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding NllbService.StatusText}"
+                                                       FontSize="11" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                            <Button Content="启动服务"
+                                                    Command="{Binding StartLocalServiceCommand}"
+                                                    CommandParameter="NLLB (本地)"
+                                                    Style="{DynamicResource BrowseButtonStyle}"
+                                                    Padding="10,6"
+                                                    Margin="0,0,6,0"
+                                                    ToolTip="启动 NLLB 本地服务（Python）" />
+                                            <Button Content="关闭服务"
+                                                    Command="{Binding PauseLocalServiceCommand}"
+                                                    CommandParameter="NLLB (本地)"
+                                                    Style="{DynamicResource BrowseButtonStyle}"
+                                                    Padding="10,6"
+                                                    Margin="0,0,6,0"
+                                                    ToolTip="关闭 NLLB 本地服务" />
+                                            <Button Content="测试"
+                                                    Command="{Binding TestTranslationApiCommand}"
+                                                    CommandParameter="NLLB (本地)"
+                                                    Style="{DynamicResource BrowseButtonStyle}"
+                                                    Padding="10,6"
+                                                    ToolTip="测试 NLLB 本地翻译连接" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="提示: NLLB 模型约 2.3GB，首次加载较慢；支持 200 种语言互译，无需经英文中转。请确保已运行 tools/setup_nllb.ps1 安装模型。"
+                                               FontSize="10" Foreground="#475569" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
 
                         <!-- Translation Status Indicator -->

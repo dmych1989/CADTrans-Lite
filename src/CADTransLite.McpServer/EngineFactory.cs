@@ -13,6 +13,8 @@ internal static class EngineFactory
     public static readonly List<string> EngineNames = new()
     {
         "Bergamot (本地)",
+        "LibreTranslate (本地)",
+        "NLLB (本地)",
         "DeepLX",
         "自定义AI",
         "百度翻译",
@@ -38,6 +40,16 @@ internal static class EngineFactory
                 // 无需 Python、无需启动子进程或 HTTP 服务。
                 return new BergamotTranslator(Cfg(cfg, "bergamot_models",
                     Path.Combine(AppContext.BaseDirectory, "tools", "bergamot")));
+            case "LibreTranslate (本地)":
+                return new LibreTranslateTranslator(new TranslationApiConfig
+                {
+                    BaseUrl = Cfg(cfg, "libre_url", LocalDefaults["libre_url"])
+                });
+            case "NLLB (本地)":
+                return new NllbTranslator(new TranslationApiConfig
+                {
+                    BaseUrl = Cfg(cfg, "nllb_url", LocalDefaults["nllb_url"])
+                });
             case "DeepLX":
                 return new DeepLXTranslator(new TranslationApiConfig
                 {
