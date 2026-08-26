@@ -1274,9 +1274,11 @@ namespace CADTransLite.UI
 
                 CurrentExcelPath = excelPath;
                 ProgressValue    = 100;
+                // 明确告知用户：rawCount = 含重复的原文实体总数；mergedItems.Count = 去重后的唯一文本
+                // （即 Excel 行数）。翻译只翻译这 mergedItems.Count 个唯一文本，完成后自动回填全部 rawCount 个实体。
                 StatusText = restored > 0
-                    ? $"✅ 已提取 {rawCount} 项（合并为 {mergedItems.Count} 行），已从原 Excel 保留 {restored} 条译文（未覆盖），Excel 已保存：{Path.GetFileName(excelPath)}"
-                    : $"✅ 已提取 {rawCount} 项（合并为 {mergedItems.Count} 行），Excel 已保存：{Path.GetFileName(excelPath)}";
+                    ? $"✅ 已提取 {rawCount} 个原文实体（含重复标注），去重合并为 {mergedItems.Count} 个唯一文本（= Excel 行数）。翻译时仅翻译这 {mergedItems.Count} 个唯一文本，完成后自动回填全部 {rawCount} 个实体；已从原 Excel 保留 {restored} 条译文（未覆盖）。Excel 已保存：{Path.GetFileName(excelPath)}"
+                    : $"✅ 已提取 {rawCount} 个原文实体（含重复标注），去重合并为 {mergedItems.Count} 个唯一文本（= Excel 行数）。翻译时仅翻译这 {mergedItems.Count} 个唯一文本，完成后自动回填全部 {rawCount} 个实体。Excel 已保存：{Path.GetFileName(excelPath)}";
             }
             catch (OperationCanceledException)
             {
