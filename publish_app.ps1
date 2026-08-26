@@ -23,6 +23,30 @@ Write-Output "[$(Get-Date)] Publishing (Release, self-contained, win-x64) ..."
 & $dotnet publish $uiProj -c Release -r win-x64 --self-contained true -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw "publish failed: $LASTEXITCODE" }
 
+# HARDENING: ensure the real WPF runtime assemblies are present.
+# On machines where the Microsoft.WindowsDesktop.App.Runtime pack is missing, `dotnet publish`
+# can accidentally drop the 15.8 KB reference-assembly facade of WindowsBase.dll (instead of the
+# ~2.1 MB real implementation), which makes the self-contained EXE fail at startup with
+# "Could not load file or assembly 'WindowsBase'". Copy the genuine implementation assemblies
+# from the shared desktop framework (same 9.0.x version) over the output to guarantee correctness.
+$winBase = Join-Path $publishDir 'WindowsBase.dll'
+$needsFix = $true
+if (Test-Path $winBase) {
+    $wbSize = (Get-Item $winBase).Length
+    # real implementation is > 1 MB; the facade is ~16 KB
+    if ($wbSize -gt 1MB) { $needsFix = $false }
+}
+if ($needsFix) {
+    $desktopShared = Get-ChildItem "$env:ProgramFiles\dotnet\shared\Microsoft.WindowsDesktop.App" -Directory -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | Select-Object -First 1
+    if ($desktopShared -and (Test-Path (Join-Path $desktopShared.FullName 'WindowsBase.dll'))) {
+        Write-Output "[$(Get-Date)] Fixing WPF runtime assemblies from shared framework: $($desktopShared.FullName)"
+        Copy-Item -Path (Join-Path $desktopShared.FullName '*') -Destination $publishDir -Recurse -Force
+    } else {
+        Write-Warning "WindowsBase.dll facade detected but no shared WindowsDesktop framework found to fix it. The EXE may fail to start."
+    }
+}
+
 # Publish the MCP bridge (CADTransLite.McpBridge.exe) into the SAME publish/ folder so the
 # UI can auto-launch it from its own directory (TryStartMcpBridge checks AppContext.BaseDirectory first).
 Write-Output "[$(Get-Date)] Publishing MCP bridge (CADTransLite.McpBridge.exe) ..."
