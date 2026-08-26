@@ -10,6 +10,7 @@ if (-not (Test-Path $dotnet)) { $dotnet = 'dotnet' }
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $srcDir   = Join-Path $repoRoot 'src'
 $uiProj   = Join-Path $srcDir 'CADTransLite.UI\CADTransLite.UI.csproj'
+$mcpProj  = Join-Path $srcDir 'CADTransLite.McpServer\CADTransLite.McpServer.csproj'
 $publishDir = Join-Path $repoRoot 'publish'
 
 $env:PATH = "$env:LOCALAPPDATA\dotnet9;$env:PATH"
@@ -21,6 +22,12 @@ if ($LASTEXITCODE -ne 0) { throw "restore failed: $LASTEXITCODE" }
 Write-Output "[$(Get-Date)] Publishing (Release, self-contained, win-x64) ..."
 & $dotnet publish $uiProj -c Release -r win-x64 --self-contained true -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw "publish failed: $LASTEXITCODE" }
+
+# Publish the MCP bridge (CADTransLite.McpBridge.exe) into the SAME publish/ folder so the
+# UI can auto-launch it from its own directory (TryStartMcpBridge checks AppContext.BaseDirectory first).
+Write-Output "[$(Get-Date)] Publishing MCP bridge (CADTransLite.McpBridge.exe) ..."
+& $dotnet publish $mcpProj -c Release -r win-x64 --self-contained true -o $publishDir
+if ($LASTEXITCODE -ne 0) { throw "mcp bridge publish failed: $LASTEXITCODE" }
 
 # Copy Bergamot offline models if provisioned at the repo root.
 $bergSrc = Join-Path $repoRoot 'tools\bergamot'
