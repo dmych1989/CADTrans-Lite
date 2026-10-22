@@ -1,99 +1,96 @@
-# Argos 翻译模型：分包与使用说明
+# 本地翻译模型：分包、自定义目录与离线使用说明
 
-CADTrans Lite 的「Argos Translate（本地）」/「LibreTranslate（本地）」离线翻译引擎，需要本地的语言模型文件（`.argosmodel`）才能工作。
+CADTrans Lite 提供三个**本地离线**翻译引擎，都需要本地的模型/语言包文件才能工作：
 
-本目录（`tools/models/`）下为你提供了**每个语言对一个独立 zip** 的分发包：
+| 引擎 | 模型位置（默认，在程序目录 `tools/` 下） | 说明 |
+| --- | --- | --- |
+| **Bergamot（本地）** | `tools/bergamot/` | 纯 .NET 原生引擎，无需 Python。每个语言对一个子目录（如 `en-zh`、`zh-en`）。 |
+| **LibreTranslate（本地 / Argos）** | `tools/py/argos_packages/` | Python 运行时 + Argos 语言包（`.argosmodel`）。 |
+| **NLLB（本地）** | `tools/py/models/nllb-200-distilled-600M/` | Python 运行时 + Meta NLLB-200 蒸馏模型。 |
+
+> 其余引擎（百度 / 腾讯 / Microsoft / DeepL / DeepLX / 自定义 AI）为云端或本地代理，**不涉及模型文件**。
+
+---
+
+## 一、把模型分包（每个渠道单独打包）
+
+仓库提供一键脚本 `tools/package_all_models.ps1`，把三个渠道的模型分别打成**独立的 zip**，输出到 `tools/models/`：
 
 ```
 tools/models/
-├─ translate-en_zh-1_9.zip     # 英 → 中
-├─ translate-zh_en-1_9.zip     # 中 → 英
-├─ translate-en_ja-1_9.zip     # 英 → 日
-├─ ...（共 100 个语言对）
+├─ bergamot-models.zip          # Bergamot 全部语言对
+├─ libretranslate-models.zip    # Argos / LibreTranslate 语言包（argos_packages）
+└─ nllb-model.zip               # NLLB-200 蒸馏模型
 ```
-
-每个 zip 内只有一个文件，例如 `translate-en_zh-1_9.zip` 解压后就是 `translate-en_zh-1_9.argosmodel`。
-
----
-
-## 模型放在哪个目录？
-
-> **应用运行时，从「CADTransLite.UI.exe 所在目录」下的 `argos_packages` 子目录加载模型。**
-
-把 `.argosmodel` 文件放进 `<应用目录>\argos_packages\` 即可，无需其他配置。
-
-### 绿色版（解压即用）
-解压 `CADTrans-Lite-win-x64-portable.zip` 后，目录结构类似：
-
-```
-D:\CADTransLite\
-├─ CADTransLite.UI.exe
-├─ deeplx_windows_amd64.exe
-├─ argos_packages\          ← 把模型放这里
-└─ ...
-```
-
-把需要的 `.argosmodel` 复制进 `argos_packages`：
-
-```
-D:\CADTransLite\argos_packages\translate-en_zh-1_9.argosmodel
-D:\CADTransLite\argos_packages\translate-zh_en-1_9.argosmodel
-```
-
-### 安装版（Inno/NSIS 安装到 Program Files）
-安装目录即应用目录，例如：
-
-```
-C:\Program Files\CADTrans Lite\argos_packages\translate-en_zh-1_9.argosmodel
-```
-
-> 若 `argos_packages` 目录不存在，新建一个同名文件夹即可。
-
----
-
-## 操作步骤（以英⇄中为例）
-
-1. 从 `tools/models/` 找到 `translate-en_zh-1_9.zip` 和 `translate-zh_en-1_9.zip`。
-2. 分别解压，得到两个 `.argosmodel` 文件。
-3. 把它们复制到 `<应用目录>\argos_packages\`。
-4. 打开 CADTrans Lite，翻译引擎选择 **Argos Translate（本地）** 或 **LibreTranslate（本地）**。
-5. 点「测试」验证离线翻译可用。
-
-需要哪些语言对，就放哪些；放错或多余的模型不会报错，只是用不到。
-
----
-
-## 前提：Python 引擎已就绪
-
-模型文件本身不含运行时。使用前请先运行一次：
 
 ```powershell
-.\tools\py\setup_engines.ps1
+# 在仓库根目录执行
+pwsh -File tools\package_all_models.ps1
+# 也可指定输出目录：
+pwsh -File tools\package_all_models.ps1 -OutputDir D:\cad-models
 ```
 
-它会安装内嵌 Python + `argostranslate` / `libretranslate` 引擎（约 2 GB，含一组基础语言包）。之后再往 `argos_packages` 里追加本分发包的模型即可扩展语言支持。
+每个 zip 解压后的顶层结构分别是 `bergamot/`、`argos_packages/`、`models/nllb-200-distilled-600M/` —— 与下方“自定义模型目录”约定完全一致，可直接分发给用户。
+
+> 若只需要某一个语言对，仍可用 `tools/package_models.ps1` 单独打包 Argos 词包（按语言对粒度）。
+> 目标机器上安装这些 `translate-*.zip` 用 `tools/install_argos_pairs.ps1` 一键完成（zip 内是双层压缩的
+> `.argosmodel`，脚本自动解好并放进 `argos_packages\`，支持装到自定义模型目录）。
 
 ---
 
-## 自己生成 / 重新打包
+## 二、自定义模型目录（安装到别的电脑）
 
-仓库提供两个脚本：
+软件支持在 **“翻译 API 设置 → 本地模型目录（自定义）”** 中指定一个目录。
+**留空**则使用程序自带的 `tools/` 目录；**一旦指定**，三个本地引擎的模型都从该目录下加载，无需把模型放进程序目录。
 
-- `tools/download_models.ps1` —— 仅下载模型到 `tools/py/argos_packages/`（不打包）。
-- `tools/package_models.ps1` —— 下载并把**每个模型单独打成 zip** 输出到 `tools/models/`。
+该目录内部结构（与上面的渠道包解压结构一致）：
 
-```powershell
-# 列出全部 100 个语言对
-pwsh -File tools\package_models.ps1 -ListOnly
-
-# 打包全部
-pwsh -File tools\package_models.ps1 -All
-
-# 只打包指定语言对
-pwsh -File tools\package_models.ps1 -Pairs en_zh,zh_en,en_es,es_en
-
-# 自定义输出目录
-pwsh -File tools\package_models.ps1 -All -OutputDir D:\cad-models
+```
+<你指定的模型根目录>/
+├─ bergamot/                              ← Bergamot 模型（来自 bergamot-models.zip）
+├─ argos_packages/                        ← LibreTranslate / Argos 语言包（来自 libretranslate-models.zip）
+└─ models/
+    └─ nllb-200-distilled-600M/            ← NLLB 模型（来自 nllb-model.zip）
 ```
 
-> 模型来自 Argos 官方包索引（argospm-index），下载地址 `argos-net.com`，需系统支持 TLS 1.2（Windows 10/11 默认满足）。
+### 使用步骤（最简单：软件内一键导入）
+1. 把渠道包拷到目标电脑（bergamot-models.zip / nllb-model.zip / 需要的 translate-*.zip）。
+2. 打开 CADTrans Lite → 翻译 API 设置 → 本地模型目录：点“浏览”选定一个目录（或留空装入程序自带 tools），再点 **“导入模型包”** 多选这些 zip——软件自动识别类型并安装到正确位置（含双层压缩的 Argos 语言对）。
+3. 选择本地引擎（Bergamot / LibreTranslate / NLLB）并“测试”。若安装前翻译服务已启动，重启软件后测试。
+
+### 手动方式（不用导入按钮）
+1. 解压 `bergamot-models.zip`、`nllb-model.zip` 到模型目录（各自自带顶层 `bergamot/`、`models/`）。
+2. Argos 语言对运行 `tools\install_argos_pairs.ps1 -PackagesDir "<模型目录>\argos_packages"` 自动安装（`translate-*.zip` 内是双层压缩的 `.argosmodel`，脚本自动处理）。
+
+> 该设置保存在用户配置（`%APPDATA%/CADTransLite/settings.json`），**独立运行的 MCP 桥接进程也会读取同一份设置**，因此在自定义目录下同样生效。
+
+---
+
+## 三、前提：Python 引擎运行时已就绪
+
+Bergamot 不需要 Python；但 **LibreTranslate / NLLB 的 Python 运行时（`tools/py`，含 `argostranslate`/`libretranslate`/`transformers`/`torch` 等）会随绿色版一起分发**（运行时不是“模型”）。模型数据（语言包 / NLLB 模型）才被单独打包。
+
+若需在本机重新安装/更新引擎与默认模型，可运行：
+
+```powershell
+.\tools\py\setup_engines.ps1     # LibreTranslate / Argos 引擎 + 基础语言包
+.\tools\setup_nllb.ps1           # NLLB 模型
+.\tools\setup_bergamot.ps1       # Bergamot 语言对模型
+```
+
+---
+
+## 四、绿色版构建（不含模型）
+
+`tools/build_portable.ps1` 生成**解压即跑**的绿色版 ZIP（`CADTrans-Lite-win-x64-portable.zip`），**刻意排除所有模型数据**：
+
+- 自包含 .NET 9 运行时 + `CADTransLite.UI.exe`
+- `CADTransLite.McpBridge.exe`（MCP 桥接）
+- 嵌入式 Python 运行时 `tools/py`（排除 `argos_packages/`、`models/`）
+- `deeplx_windows_amd64.exe`、`docs/`、`README.md`、`tools/*.ps1`
+
+```powershell
+pwsh -File tools\build_portable.ps1
+```
+
+模型请用 `tools/package_all_models.ps1` 单独打包分发，由用户解压到“自定义模型目录”。

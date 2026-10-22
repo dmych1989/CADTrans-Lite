@@ -14,7 +14,7 @@ public sealed class UserSettings
     /// Path to the ODA File Converter executable.
     /// Default: <see cref="OdaSettings.DefaultExecutablePath"/>.
     /// </summary>
-    public string OdaPath { get; set; } = OdaSettings.DefaultExecutablePath;
+    public string OdaPath { get; set; } = OdaSettings.ResolveExecutablePath();
 
     /// <summary>
     /// Import settings for CAD text extraction.
@@ -76,4 +76,14 @@ public sealed class UserSettings
 
     /// <summary>DWG 输出版本代码。默认 "ACAD2018"。</summary>
     public string OutputDwgVersion { get; set; } = "ACAD2018";
+
+    /// <summary>
+    /// 本地模型根目录（自定义）。留空表示使用程序自带的 tools 目录。
+    /// 若指定，三个本地离线引擎的模型将从该目录下的统一结构加载：
+    ///   &lt;目录&gt;/bergamot（Bergamot）
+    ///   &lt;目录&gt;/argos_packages（LibreTranslate / Argos）
+    ///   &lt;目录&gt;/models/nllb-200-distilled-600M（NLLB）
+    /// 这样在别的电脑上把各渠道模型包解压到此处即可，无需把模型放进程序目录。
+    /// </summary>
+    public string LocalModelRoot { get; set; } = string.Empty;
 }

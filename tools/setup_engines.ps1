@@ -141,3 +141,14 @@ Write-Host "Argos Translate + LibreTranslate are ready and fully offline." -Fore
 Write-Host "Packs: $env:ARGOS_PACKAGES_DIR" -ForegroundColor White
 Write-Host "MiniSBD: $(Join-Path $pyDir 'argos-translate\minisbd')" -ForegroundColor White
 Write-Host "In CADTrans Lite, select 'Argos Translate (local)' or 'LibreTranslate (local)' and click Test." -ForegroundColor White
+
+# ---------------------------------------------------------------------------
+# 应用 Python 运行时补丁（argostranslate 离线分句修复；tools/py 不入库，
+# 补丁源文件放在 tools/py_patches 随仓库分发）
+# ---------------------------------------------------------------------------
+$pyPatch = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Definition) 'py_patches\apply_py_patches.ps1'
+if (Test-Path $pyPatch) {
+    Write-Host ""
+    & $pyPatch -PyDir $pyDir
+}
+

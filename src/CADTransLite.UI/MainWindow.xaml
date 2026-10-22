@@ -481,7 +481,7 @@
                                         <TextBlock Grid.Row="0" Grid.Column="0" Text="接口预设:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                         <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding CustomAiPresets}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedCustomAiPreset}" FontSize="11" Padding="5,3" Margin="0,1" ToolTip="选择常用服务商，自动填充 Base URL 与默认模型" />
                                         <TextBlock Grid.Row="1" Grid.Column="0" Text="API Key:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged, Delay=300}" FontSize="11" Padding="5,3" Margin="0,1" FontFamily="Consolas" ToolTip="AI模型的API密钥" />
+                                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged, Delay=300}" FontSize="11" Padding="5,3" Margin="0,1" FontFamily="Consolas" ToolTip="AI模型的API密钥。AMD Radeon AI 密钥请在 https://developer.amd.com.cn/radeon/tokenfactory?source=cherry-studio 获取" />
                                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Base URL:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                         <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding BaseUrl, UpdateSourceTrigger=PropertyChanged}" FontSize="11" Padding="5,3" Margin="0,1" ToolTip="API服务地址（自动拼接 /chat/completions），如 https://api.openai.com/v1" />
                                         <TextBlock Grid.Row="3" Grid.Column="0" Text="模型名称:" Style="{DynamicResource SettingLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0" />
@@ -619,6 +619,39 @@
                                 </StackPanel>
                             </Border>
 
+                            <!-- 本地模型目录（自定义） -->
+                            <Border Style="{DynamicResource EngineCardStyle}"
+                                    BorderThickness="4,1,1,1"
+                                    BorderBrush="#7C3AED"
+                                    Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="本地模型目录（自定义）"
+                                               FontWeight="Bold" FontSize="13" Margin="0,0,0,4" />
+                                    <TextBlock Text="留空则使用程序自带的 tools 目录。若指定，三个本地引擎的模型将从该目录下加载：bergamot/（Bergamot）、argos_packages/（LibreTranslate / Argos）、models/nllb-200-distilled-600M/（NLLB）。把各渠道模型包解压到此处即可。"
+                                               FontSize="11" Foreground="#475569" TextWrapping="Wrap" />
+                                    <Grid Margin="0,6,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0"
+                                                 Text="{Binding LocalModelRoot, UpdateSourceTrigger=PropertyChanged}"
+                                                 FontSize="11" Padding="5,3" Margin="0,0,6,0"
+                                                 ToolTip="自定义本地模型根目录" />
+                                        <Button Grid.Column="1" Content="浏览"
+                                                Style="{DynamicResource BrowseButtonStyle}"
+                                                Command="{Binding BrowseModelRootCommand}"
+                                                ToolTip="浏览并选择本地模型目录" />
+                                        <Button Grid.Column="2" Content="导入模型包"
+                                                Style="{DynamicResource BrowseButtonStyle}"
+                                                Command="{Binding ImportModelPackagesCommand}"
+                                                Margin="6,0,0,0"
+                                                ToolTip="选择 bergamot-models.zip / nllb-model.zip / translate-*.zip（可多选），自动安装到模型目录" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
                             <Border Style="{DynamicResource EngineCardStyle}"
                                     BorderThickness="4,1,1,1"
                                     BorderBrush="{DynamicResource EngineBergamot}"
@@ -658,6 +691,13 @@
                                                     Style="{DynamicResource BrowseButtonStyle}"
                                                     Padding="10,6"
                                                     ToolTip="测试 Bergamot 本地离线翻译连接" />
+                                            <Button Content="关闭服务"
+                                                    Command="{Binding PauseLocalServiceCommand}"
+                                                    CommandParameter="Bergamot (本地)"
+                                                    Style="{DynamicResource BrowseButtonStyle}"
+                                                    Padding="10,6"
+                                                    Margin="6,0,0,0"
+                                                    ToolTip="卸载当前语言对模型，释放内存（进程内引擎）" />
                                         </StackPanel>
                                     </Grid>
                                     <TextBlock Text="提示: 纯 .NET 离线引擎（依赖 BergamotTranslatorSharp 原生库，无 Python）。使用前请运行 tools/setup_bergamot.ps1 下载语言模型；任意语言对互译通过「经英文中转」实现。"
@@ -827,7 +867,6 @@
 
                                 <TextBlock Text="导出与去重:" FontWeight="Bold" FontSize="11" Margin="0,8,0,3" />
                                 <WrapPanel>
-                                    <CheckBox Content="多列Excel格式 (11列)" IsChecked="{Binding UseRichExcelFormat}" Margin="0,1,14,1" FontSize="11" ToolTip="启用后导出11列富元数据格式（Handle/类型/图层/原文/清洗/译文/状态等）；关闭则使用传统2列格式" />
                                     <CheckBox Content="清洗后去重" IsChecked="{Binding EnableCleanedDedup}" Margin="0,1,14,1" FontSize="11" ToolTip="启用后，合并阶段会按 (类型+清洗文本) 进行二次去重，减少翻译行数" />
                                 </WrapPanel>
                             </StackPanel>

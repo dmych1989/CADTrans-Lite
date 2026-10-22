@@ -157,16 +157,25 @@ public static class LocalServerHelper
                 // resolve correctly.
                 psi.WorkingDirectory = Path.GetDirectoryName(full) ?? dir;
 
-                // Point LibreTranslate / NLLB at the bundled language packs so they
-                // load offline and never re-download models at runtime.
-                var argosPkgs = Path.Combine(psi.WorkingDirectory, "argos_packages");
+                // 离线语言包/模型目录：优先使用用户在设置里指定的“本地模型根目录”，
+                // 否则回退到程序自带的 tools/py/argos_packages 与 tools/py/models。
+                // 这样在别的电脑上把模型解压到自定义目录后，本地引擎即可从那里加载。
+                var argosPkgs = ModelLocations.ArgosPackagesDir();
                 psi.EnvironmentVariables["ARGOS_PACKAGES_DIR"] = argosPkgs;
+                // NLLB 模型目录（nllb_server.py 优先读取 NLLB_MODEL 环境变量）。
+                psi.EnvironmentVariables["NLLB_MODEL"] = ModelLocations.NllbModelDir();
 
-                // 使用 argostranslate 默认的句子分句器（基于标点，完全离线）。
-                // 注：此前注入的 ARGOS_CHUNK_TYPE=MINISBD 需要联网下载 MiniSBD 的
-                // 中文/日/韩/俄文 ONNX 模型，离线环境下会导致除 en->zh 外的方向全部
-                // 挂起/超时/500。改为去掉该变量；libretranslate_server.py 也会强制清除它，
-                // 双重保险确保离线翻译可用。
+                // 强制使用 MiniSBD 分句器（模型为本地 .onnx，随包放在
+                // tools/py/argos-translate/minisbd，完全离线）。
+                //
+                // 为什么不能留默认值：argostranslate 1.11 的默认分句逻辑是「包内带 stanza
+                // 目录就用 StanzaSentencizer」。而中文包内置的是 stanza/zh-hans/tokenize/gsdsimp.pt，
+                // StanzaSentencizer 却按 from_code("zh") 去找模型 → 认为缺失 → 去
+                // huggingface.co 下载（connect 无超时）→ 离线环境下请求挂几分钟，
+                // 表现为「正在测试 LibreTranslate (本地)连接…」长时间卡住。
+                // MiniSBD 的分句模型（含 zh-hans/ja/ko/ru 等）已随包缓存，无需联网；
+                // sbd.py 还做了「缓存缺失则回退到标点分句」的兜底，不会再有下载挂起。
+                psi.EnvironmentVariables["ARGOS_CHUNK_TYPE"] = "MINISBD";
                 psi.EnvironmentVariables["XDG_DATA_HOME"] = psi.WorkingDirectory;
 
                 // 让 Python 以 UTF-8 且不缓冲地输出，否则重定向后中文乱码、日志也会延迟很久才出现。
@@ -359,6 +368,21 @@ public static class LocalServerHelper
     }
 
     /// <summary>
+    /// 构造带「确定长度」的 JSON 请求体。
+    /// <para>
+    /// 必须用它替代 <c>HttpClient.PostAsJsonAsync</c>：后者内部使用 <c>JsonContent</c>，
+    /// 其长度未知，HttpClient 会以 <c>Transfer-Encoding: chunked</c> 发送请求体。
+    /// 而本地 python 服务（<c>tools/py/nllb_server.py</c> 等）基于 <c>BaseHTTPRequestHandler</c>，
+    /// 只按 <c>Content-Length</c> 读取 body —— chunked 请求下长度读到 0，服务端把 <c>q</c> 当成
+    /// 空串，直接返回 <c>200 {"translatedText": ""}</c>，宿主端于是报
+    /// 「NLLB 翻译返回为空（模型未产生有效译文）」—— 实际上模型根本没收到文本。
+    /// </para>
+    /// 序列化成字符串后使用 <see cref="StringContent"/>，即可带正确的 Content-Length。
+    /// </summary>
+    public static StringContent CreateJsonBody<T>(T payload, JsonSerializerOptions options)
+        => new(JsonSerializer.Serialize(payload, options), Encoding.UTF8, "application/json");
+
+    /// <summary>
     /// 探测指定地址是否为一个“健康的本应用翻译服务”。优先使用轻量的 <c>/ready</c> 端点
     /// （本地引擎支持；返回 <c>{ ready: true }</c> 即视为就绪）；若该端点不可用，则退化为
     /// 一次真实翻译探测（en→zh），非空译文即视为健康。两者皆失败时返回 <c>false</c>，
@@ -394,7 +418,8 @@ public static class LocalServerHelper
                 ["target"] = "zh",
                 ["format"] = "text"
             };
-            using var pr = await probe.PostAsJsonAsync($"{root}/translate", body, JsonSerializerOptions.Web, cancellationToken)
+            using var pr = await probe.PostAsync($"{root}/translate",
+                    CreateJsonBody(body, JsonSerializerOptions.Web), cancellationToken)
                 .ConfigureAwait(false);
             if (pr.IsSuccessStatusCode)
             {

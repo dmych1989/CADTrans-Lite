@@ -56,7 +56,7 @@ namespace CADTransLite.UI
         // ─────────────────────────────────────────────────────────────
         // Backing fields – ODA
         // ─────────────────────────────────────────────────────────────
-        private string _odaPath = OdaSettings.DefaultExecutablePath;
+        private string _odaPath = OdaSettings.ResolveExecutablePath();
         private string _odaStatusText = "检测中...";
         private string _odaStatusColor = "Orange";
         private bool _isOdaAvailable;
@@ -71,6 +71,9 @@ namespace CADTransLite.UI
         // Baidu
         private bool _enableBaiduTranslate;
         private string _baiduAppId = "";
+
+        // 本地模型根目录（自定义）：为空表示使用程序自带 tools 目录。
+        private string _localModelRoot = "";
         private string _baiduAppKey = "";
 
         // Tencent
@@ -101,6 +104,8 @@ namespace CADTransLite.UI
         private readonly LocalServiceStatus _libreTranslateService = new();
         private readonly LocalServiceStatus _nllbService = new();
         private readonly LocalServiceStatus _bergamotService = new();
+        // 当前进程内 Bergamot 引擎实例（WarmUp 后保留，供翻译复用；「关闭服务」时置空）。
+        private CADTransLite.Core.Services.BergamotTranslator? _bergamotEngine;
         private readonly LocalServiceStatus _deepLXService = new();
         private readonly System.Timers.Timer _localServiceMonitor;
 
@@ -127,7 +132,7 @@ namespace CADTransLite.UI
         // ─────────────────────────────────────────────────────────────
         // Phase 3 — Rich Excel format & cleaned dedup backing fields
         // ─────────────────────────────────────────────────────────────
-        private bool _useRichExcelFormat = true;
+        private bool _useRichExcelFormat = false;
         private bool _enableCleanedDedup = false;
 
         // ─────────────────────────────────────────────────────────────
@@ -166,6 +171,8 @@ namespace CADTransLite.UI
             StartMcpBridgeCommand     = new AsyncRelayCommand(StartMcpBridgeAsync, AsyncRelayCommandOptions.AllowConcurrentExecutions);
             SaveSettingsCommand        = new RelayCommand(SaveSettings);
             BrowseOdaPathCommand       = new RelayCommand(BrowseOdaPath);
+            BrowseModelRootCommand     = new RelayCommand(BrowseModelRoot);
+            ImportModelPackagesCommand = new AsyncRelayCommand(ImportModelPackagesAsync);
             OpenOdaDownloadCommand     = new RelayCommand(OpenOdaDownloadPage);
             SelectExcelCommand         = new RelayCommand(SelectExcelFile);
             BrowseTranslateExcelCommand = new RelayCommand(BrowseTranslateExcel);
@@ -432,6 +439,13 @@ namespace CADTransLite.UI
         public bool EnableNllb { get => _enableNllb; set { _enableNllb = value; OnPropertyChanged(); } }
         public string NllbUrl  { get => _nllbUrl;    set { _nllbUrl    = value; OnPropertyChanged(); } }
 
+        // 本地模型根目录（自定义）
+        public string LocalModelRoot
+        {
+            get => _localModelRoot;
+            set { _localModelRoot = value; OnPropertyChanged(); }
+        }
+
         // DeepL
         public bool EnableDeepL     { get => _enableDeepL;     set { _enableDeepL     = value; OnPropertyChanged(); } }
         public string DeepLApiKey   { get => _deepLApiKey;     set { _deepLApiKey     = value; OnPropertyChanged(); } }
@@ -465,6 +479,7 @@ namespace CADTransLite.UI
             new("OpenRouter",           "https://openrouter.ai/api/v1",                                              "openai/gpt-4o-mini"),
             new("硅基流动 SiliconFlow",  "https://api.siliconflow.cn/v1",                                            "deepseek-ai/DeepSeek-V3"),
             new("推理时代 AIHubMix",     "https://aihubmix.com/v1",                                                   "deepseek-chat"),
+            new("AMD Radeon AI",         "https://developer.amd.com.cn/radeon/v1",                                    "meta-llama/llama-3.1-8b-instruct"),
         };
 
         private CustomAiPreset? _selectedCustomAiPreset;
@@ -782,9 +797,11 @@ namespace CADTransLite.UI
         public LocalServiceStatus DeepLXService          => _deepLXService;
         public LocalServiceStatus BergamotService        => _bergamotService;
         /// <summary>Bergamot 模型目录（只读展示用）。模型由 tools/setup_bergamot.ps1 下载到此处。</summary>
-        public string BergamotModelsPath => System.IO.Path.Combine(System.AppContext.BaseDirectory, "tools", "bergamot");
+        public string BergamotModelsPath => CADTransLite.Core.Services.ModelLocations.BergamotModelsDir();
         public IRelayCommand      SaveSettingsCommand       { get; }
         public IRelayCommand      BrowseOdaPathCommand      { get; }
+        public IRelayCommand      BrowseModelRootCommand    { get; }
+        public IAsyncRelayCommand ImportModelPackagesCommand { get; }
         public IRelayCommand      OpenOdaDownloadCommand    { get; }
         public IRelayCommand      SelectExcelCommand        { get; }
         public IRelayCommand      BrowseTranslateExcelCommand { get; }
@@ -833,6 +850,48 @@ namespace CADTransLite.UI
 
             if (dlg.ShowDialog() == true)
                 OdaPath = dlg.FileName;   // setter triggers CheckOdaStatus()
+        }
+
+        private void BrowseModelRoot()
+        {
+            var picked = FolderPicker.PickFolder(
+                "选择本地模型目录（将从此目录下的 bergamot/、argos_packages/、models/ 加载模型）",
+                _localModelRoot);
+            if (string.IsNullOrWhiteSpace(picked))
+                return;
+
+            LocalModelRoot = picked;
+            // 立即持久化，确保本地引擎（含独立运行的 MCP 桥接进程）能从磁盘读到新目录。
+            SaveSettings();
+            StatusText = $"✅ 本地模型目录已设置为：{picked}（Bergamot/Argos/NLLB 将从此处加载）";
+        }
+
+        /// <summary>
+        /// 让用户选择分发的模型压缩包（bergamot-models.zip / nllb-model.zip / translate-*.zip），
+        /// 自动识别类型并安装到本地模型目录（跟随“本地模型根目录”设置；未设置则装入程序自带 tools 布局）。
+        /// </summary>
+        private async Task ImportModelPackagesAsync()
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title       = "选择模型压缩包（bergamot-models / nllb-model / translate-*.zip，可多选）",
+                Filter      = "模型压缩包 (*.zip)|*.zip|所有文件 (*.*)|*.*",
+                Multiselect = true,
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            string? customRoot = string.IsNullOrWhiteSpace(_localModelRoot) ? null : _localModelRoot;
+            // 注意：VM 已有名为 Progress 的属性，这里必须用 IProgress 接口类型避免类型名遮蔽。
+            IProgress<string> progress = new System.Progress<string>(s => StatusText = s);
+            progress.Report("开始安装模型包 …");
+            try
+            {
+                await CADTransLite.Core.Services.ModelPackageInstaller.InstallAsync(dlg.FileNames, customRoot, progress);
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"❌ 模型包安装失败：{ex.Message}";
+            }
         }
 
         private static void OpenOdaDownloadPage()
@@ -2066,9 +2125,9 @@ namespace CADTransLite.UI
 
             try
             {
-                var api = new CADTransLite.Core.Services.BergamotTranslator(
+                _bergamotEngine ??= new CADTransLite.Core.Services.BergamotTranslator(
                     System.IO.Path.Combine(System.AppContext.BaseDirectory, "tools", "bergamot"));
-                var err = api.WarmUp(src, tgt);
+                var err = _bergamotEngine.WarmUp(src, tgt);
                 if (err is null)
                 {
                     status.StatusText = "● 模型已就绪（进程内）";
@@ -2096,12 +2155,24 @@ namespace CADTransLite.UI
 
         private async Task PauseLocalServiceAsync(string? provider)
         {
-            // Bergamot 是进程内引擎，没有可停止的外部进程；仅给出提示并复位状态。
+            // Bergamot 是进程内引擎：没有外部进程，但有进程内模型（原生内存）。
+            // 「关闭服务」= 卸载模型并释放引擎实例，状态复位为已关闭。
             if (provider == "Bergamot (本地)")
             {
-                _bergamotService.StatusText = "○ 进程内引擎（无需关闭）";
-                _bergamotService.StatusBrush = Brushes.Gray;
-                StatusText = "ℹ️ Bergamot 为进程内引擎，无需关闭服务。";
+                if (_bergamotEngine != null)
+                {
+                    try { _bergamotEngine.Unload(); } catch { /* 忽略卸载异常 */ }
+                    _bergamotEngine = null;
+                    _bergamotService.StatusText = "○ 已关闭（模型已卸载）";
+                    _bergamotService.StatusBrush = Brushes.Gray;
+                    StatusText = "🛑 Bergamot 本地引擎已关闭，模型已从内存卸载。";
+                }
+                else
+                {
+                    _bergamotService.StatusText = "○ 未运行";
+                    _bergamotService.StatusBrush = Brushes.Gray;
+                    StatusText = "ℹ️ Bergamot 本地引擎当前未加载模型。";
+                }
                 return;
             }
 
@@ -2418,6 +2489,7 @@ namespace CADTransLite.UI
             AiFilterModelName  = _aiFilterModelName,
             GlossaryPath       = _glossaryPath,
             OutputDwgVersion   = _selectedOutputVersion?.VersionCode ?? "ACAD2018",
+            LocalModelRoot     = _localModelRoot,
             Import = new ImportSettings
             {
                 ImportBlockAttributes = _importBlockAttributes,
@@ -2460,7 +2532,7 @@ namespace CADTransLite.UI
         /// <summary>Applies a loaded UserSettings to ViewModel properties.</summary>
         private void ApplyUserSettings(UserSettings s)
         {
-            _odaPath           = s.OdaPath;
+            _odaPath           = File.Exists(s.OdaPath) ? s.OdaPath : OdaSettings.ResolveExecutablePath();
             _sourceLangCode    = s.SourceLanguageCode;
             _targetLangCode    = s.TargetLanguageCode;
             _selectedProvider  = s.SelectedProvider;
@@ -2510,6 +2582,7 @@ namespace CADTransLite.UI
             _aiFilterModelName   = s.AiFilterModelName ?? string.Empty;
             _glossaryPath        = s.GlossaryPath ?? string.Empty;
             _selectedOutputVersion = OutputVersions.FirstOrDefault(v => v.VersionCode == s.OutputDwgVersion) ?? OutputVersions[0];
+            _localModelRoot        = s.LocalModelRoot ?? string.Empty;
 
             _odaConverter.ExecutablePath = _odaPath;
 
@@ -2603,8 +2676,9 @@ namespace CADTransLite.UI
 
                 case "Bergamot (本地)":
                     // 纯 .NET 离线引擎：进程内运行，模型在 tools/bergamot 下，无需 URL / Python。
-                    return new CADTransLite.Core.Services.BergamotTranslator(
-                        System.IO.Path.Combine(System.AppContext.BaseDirectory, "tools", "bergamot"));
+                    // 复用已 WarmUp 的实例（「关闭服务」后为空则临时新建）。
+                    return _bergamotEngine ?? new CADTransLite.Core.Services.BergamotTranslator(
+                        CADTransLite.Core.Services.ModelLocations.BergamotModelsDir());
 
                 case "LibreTranslate (本地)":
                     if (string.IsNullOrWhiteSpace(_libreTranslateUrl))

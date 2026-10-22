@@ -39,7 +39,7 @@ internal static class EngineFactory
                 // 纯 .NET 离线引擎：进程内运行 bergamot 原生库，模型在 tools/bergamot 下。
                 // 无需 Python、无需启动子进程或 HTTP 服务。
                 return new BergamotTranslator(Cfg(cfg, "bergamot_models",
-                    Path.Combine(AppContext.BaseDirectory, "tools", "bergamot")));
+                    ModelLocations.BergamotModelsDir()));
             case "LibreTranslate (本地)":
                 return new LibreTranslateTranslator(new TranslationApiConfig
                 {

@@ -97,7 +97,7 @@ public sealed class ImportSettings
     /// true = 11 列格式（Handle/类型/图层/原文/清洗/译文/状态等）。
     /// 默认 true。
     /// </summary>
-    public bool UseRichExcelFormat { get; set; } = true;
+    public bool UseRichExcelFormat { get; set; } = false;
 
     // ────────────────────────────────────────────────────────────────
     // v3.0 Phase 4 — Feature toggles

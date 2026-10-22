@@ -125,6 +125,20 @@ public sealed class BergamotTranslator : ITranslationApi
         }
     }
 
+    /// <summary>
+    /// 卸载所有已加载的语言对模型并释放进程内推理服务（释放原生内存）。
+    /// 之后再次翻译 / WarmUp 会重新加载模型。对应 UI 的「关闭服务」按钮。
+    /// </summary>
+    public void Unload()
+    {
+        foreach (var cached in _cache.Values)
+        {
+            if (cached.Service is IDisposable disposable)
+                disposable.Dispose();
+        }
+        _cache.Clear();
+    }
+
     private Cached GetOrCreateService(string sourceLang, string targetLang)
     {
         var (s, t) = NormalizePair(sourceLang, targetLang);

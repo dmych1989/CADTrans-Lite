@@ -64,4 +64,18 @@ if (Test-Path $bergSrc) {
     Write-Output "[$(Get-Date)] (跳过) tools\bergamot 不存在，本地翻译模型未下载。可运行 tools\setup_bergamot.ps1 获取。"
 }
 
+# Copy the bundled embeddable Python runtime (tools/py) required by the local
+# LibreTranslate / NLLB engines. `dotnet publish -o` wipes publish/, so we must
+# always restore it here; otherwise those engines fail with "未找到 tools/py/python.exe".
+$pySrc = Join-Path $repoRoot 'tools\py'
+$pyDst = Join-Path $publishDir 'tools\py'
+if (Test-Path $pySrc) {
+    Write-Output "[$(Get-Date)] Copying embedded Python runtime (tools/py) ..."
+    if (-not (Test-Path $pyDst)) { New-Item -ItemType Directory -Path $pyDst | Out-Null }
+    Copy-Item -Path (Join-Path $pySrc '*') -Destination $pyDst -Recurse -Force
+    Write-Output "[$(Get-Date)] tools/py OK"
+} else {
+    Write-Output "[$(Get-Date)] (跳过) tools\py 不存在，本地 LibreTranslate/NLLB 引擎将不可用。"
+}
+
 Write-Output "[$(Get-Date)] PUBLISH_DONE -> $publishDir"

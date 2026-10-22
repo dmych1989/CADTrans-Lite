@@ -333,7 +333,7 @@ internal static class BridgeHandler
         ImportFrozenLayers = p.Bool("import_frozen_layers", true),
         ImportLockedLayers = p.Bool("import_locked_layers", true),
         ImportOffLayers = p.Bool("import_off_layers", false),
-        UseRichExcelFormat = p.Bool("use_rich_excel_format", true),
+        UseRichExcelFormat = p.Bool("use_rich_excel_format", false),
         EnableCleanedDedup = p.Bool("enable_cleaned_dedup", false),
         EnableLayoutAdjust = p.Bool("enable_layout_adjust", true),
         EnableAiFilter = p.Bool("enable_ai_filter", false),

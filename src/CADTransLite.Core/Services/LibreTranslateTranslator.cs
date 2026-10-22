@@ -77,7 +77,9 @@ namespace CADTransLite.Core.Services;
         {
             try
             {
-                using var resp = await _http.PostAsJsonAsync($"{_baseUrl}/translate", payload, JsonOptions, cancellationToken)
+                // 同 NLLB：避免 chunked 请求体（本地 python 服务只认 Content-Length）。
+                using var content = LocalServerHelper.CreateJsonBody(payload, JsonOptions);
+                using var resp = await _http.PostAsync($"{_baseUrl}/translate", content, cancellationToken)
                     .ConfigureAwait(false);
                 resp.EnsureSuccessStatusCode();
                 using var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken)

@@ -82,21 +82,25 @@ public sealed class NllbTranslator : ITranslationApi
         {
             try
             {
-                using var resp = await _http.PostAsJsonAsync($"{_baseUrl}/translate", payload, JsonOptions, cancellationToken)
+                // 必须用带固定 Content-Length 的 StringContent（见 LocalServerHelper.CreateJsonBody 注释）：
+                // PostAsJsonAsync 会以 chunked 发送，nllb_server.py 读不到 body，q 变空串，
+                // 服务端返回 200 + 空译文，宿主端误报「模型未产生有效译文」。
+                using var content = LocalServerHelper.CreateJsonBody(payload, JsonOptions);
+                using var resp = await _http.PostAsync($"{_baseUrl}/translate", content, cancellationToken)
                     .ConfigureAwait(false);
                 resp.EnsureSuccessStatusCode();
                 using var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
                 if (doc.RootElement.TryGetProperty("error", out var err) && err.ValueKind == JsonValueKind.String)
                 {
-                    _startedOnce = false;
-                    KillFaultyServer();
+                    // 服务刚刚应答了 HTTP——进程显然活着。此时杀服务只会让约 40s 的模型
+                    // 冷加载前功尽弃（并可能引发「启动→被杀→再启动」风暴）。
+                    // 业务错误（空译文 / 内存不足等）交由调用方按原文回退处理。
                     throw new InvalidOperationException($"NLLB 服务返回错误：{err.GetString()}");
                 }
                 if (!doc.RootElement.TryGetProperty("translatedText", out var t))
                 {
-                    _startedOnce = false;
-                    KillFaultyServer();
+                    // 同上：能收到响应就说明服务活着，不应杀进程。
                     throw new InvalidOperationException("NLLB 本地服务返回结果缺少 translatedText 字段。");
                 }
 
@@ -105,10 +109,8 @@ public sealed class NllbTranslator : ITranslationApi
                 var translated = t.GetString();
                 if (string.IsNullOrWhiteSpace(translated))
                 {
-                    // 坏实例会持续返回空，必须杀掉端口进程强制重启，
-                    // 否则 ShouldStartFreshServer 会永久复用带标记的坏实例。
-                    _startedOnce = false;
-                    KillFaultyServer();
+                    // 不杀进程：模型空输出属于请求级问题（源/目标语言不被支持、输入过短等），
+                    // 重启服务并不能解决，反而会销毁已加载的模型（约 40s）。
                     throw new InvalidOperationException("NLLB 翻译返回为空（模型未产生有效译文，可能是源/目标语言不被支持）。");
                 }
                 return translated;
@@ -116,10 +118,13 @@ public sealed class NllbTranslator : ITranslationApi
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 lastError = ex;
-                // 翻译失败：杀掉疑似坏实例（服务已退出则无害），
-                // 再重置就绪标记让下次 EnsureReadyAsync 重新探测并拉起干净实例。
                 _startedOnce = false;
-                KillFaultyServer();
+                // 关键策略：只有当服务进程确实「无响应」时才强杀重启。
+                // 服务仍在应答（包括返回业务错误、或正在冷加载模型）时杀掉它，
+                // 会让约 40s 的模型加载从头再来，并引发「启动→被杀→再启动」风暴
+                // （实例只能活几秒，模型永远加载不完，表现为反复「调用失败」）。
+                if (!await IsNllbServerAliveAsync().ConfigureAwait(false))
+                    KillFaultyServer();
                 await EnsureReadyAsync(cancellationToken).ConfigureAwait(false);
                 await Task.Delay(300 * (attempt + 1), cancellationToken).ConfigureAwait(false);
             }
@@ -145,46 +150,54 @@ public sealed class NllbTranslator : ITranslationApi
                 throw new InvalidOperationException($"无法解析 NLLB 本地服务地址: {_baseUrl}");
 
             // NLLB 在 serve_forever() 时立即开放端口，模型在「第一次翻译」时才懒加载（约 30~60s）。
-            // 因此「端口开放」≠「模型已就绪」。使用 ShouldStartFreshServer 决策：
-            //   - 端口未开 → 拉起新实例；
-            //   - 端口被本会话占用 → 直接复用（模型冷加载由真实请求长超时覆盖，不杀重启）；
-            //   - 端口被「非本会话」进程占用（如上次调试遗留的坏实例）→ 先清理再拉起干净实例，
-            //     避免永远复用返回 500 的坏服务。这正是此前「测试多次仍失败」的根因修复。
-            if (LocalServerHelper.ShouldStartFreshServer(host, port))
+            // 因此「端口开放」≠「模型已就绪」。端口被占用时的策略：
+            //   - 探测占用者是否是活着的 NLLB 服务（GET / 立即应答，与模型是否加载完成无关）。
+            //     活着 → 直接复用（哪怕是上次会话或 MCP 桥接进程启动的）。若按「非本会话」
+            //     一刀切杀掉重启，UI 与桥接会互相杀对方实例、冷加载被反复打断（实例只能活
+            //     几秒，模型永远加载不完）——这正是「启动→被杀→再启动」风暴与「翻译返回为空」
+            //     反复出现的根因。
+            //   - 不应答（半死 socket）→ 清理后拉起干净实例。
+            if (LocalServerHelper.IsPortOpen(host, port))
             {
-                // 若上面清理了非本会话的占用者，等端口真正释放再启动，避免新实例绑定冲突。
+                if (await IsNllbServerAliveAsync().ConfigureAwait(false))
+                {
+                    _startedOnce = true;
+                    return;
+                }
+
+                LocalServerHelper.StopServerOnPort(host, port);
                 var closeDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(6);
                 while (DateTime.UtcNow < closeDeadline && LocalServerHelper.IsPortOpen(host, port))
                     await Task.Delay(200, cancellationToken).ConfigureAwait(false);
+            }
 
-                // 最多尝试启动 2 次：若新实例因端口尚未完全释放而绑定失败，清理后重试一次。
-                for (int startTry = 0; startTry < 2; startTry++)
+            // 最多尝试启动 2 次：若新实例因端口尚未完全释放而绑定失败，清理后重试一次。
+            for (int startTry = 0; startTry < 2; startTry++)
+            {
+                LocalServerHelper.TryStartBundledServer(
+                    PythonExeName,
+                    new[] { NllbScriptName, "--port", port.ToString() },
+                    NllbSubDir);
+
+                // 仅等待端口开放（确认 python 进程已起来并开始监听），最多 30s；
+                // 不等待翻译就绪，因为那要在真实请求里由长超时覆盖。
+                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+                while (DateTime.UtcNow < deadline)
                 {
-                    LocalServerHelper.TryStartBundledServer(
-                        PythonExeName,
-                        new[] { NllbScriptName, "--port", port.ToString() },
-                        NllbSubDir);
-
-                    // 仅等待端口开放（确认 python 进程已起来并开始监听），最多 30s；
-                    // 不等待翻译就绪，因为那要在真实请求里由长超时覆盖。
-                    var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
-                    while (DateTime.UtcNow < deadline)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (LocalServerHelper.IsPortOpen(host, port))
-                            break;
-                        await Task.Delay(500, cancellationToken).ConfigureAwait(false);
-                    }
-
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (LocalServerHelper.IsPortOpen(host, port))
                         break;
-
-                    // 端口仍未开放：新实例可能绑定失败，清理后重试。
-                    LocalServerHelper.StopServerOnPort(host, port);
-                    var retryClose = DateTime.UtcNow + TimeSpan.FromSeconds(6);
-                    while (DateTime.UtcNow < retryClose && LocalServerHelper.IsPortOpen(host, port))
-                        await Task.Delay(200, cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(500, cancellationToken).ConfigureAwait(false);
                 }
+
+                if (LocalServerHelper.IsPortOpen(host, port))
+                    break;
+
+                // 端口仍未开放：新实例可能绑定失败，清理后重试。
+                LocalServerHelper.StopServerOnPort(host, port);
+                var retryClose = DateTime.UtcNow + TimeSpan.FromSeconds(6);
+                while (DateTime.UtcNow < retryClose && LocalServerHelper.IsPortOpen(host, port))
+                    await Task.Delay(200, cancellationToken).ConfigureAwait(false);
             }
 
             _startedOnce = true;
@@ -196,7 +209,7 @@ public sealed class NllbTranslator : ITranslationApi
     }
 
     /// <summary>
-    /// 杀掉当前 URL 对应端口上的服务进程。仅在确认实例已损坏（返回空译文 / HTTP 错误 / 服务错误）时调用，
+    /// 杀掉当前 URL 对应端口上的服务进程。仅在确认实例已无响应（进程已死/半死 socket）时调用，
     /// 以便 <see cref="EnsureReadyAsync"/> 下次探测时端口已释放、可拉起干净实例。
     /// </summary>
     private void KillFaultyServer()
@@ -209,6 +222,27 @@ public sealed class NllbTranslator : ITranslationApi
         catch
         {
             // 杀进程失败不应阻断主流程；下次 EnsureReadyAsync 会重新评估。
+        }
+    }
+
+    /// <summary>
+    /// 探测端口上是否有一个「活着的 NLLB 服务」：GET / 应立即返回身份 JSON
+    /// （{"message":"NLLB server is running"}），与模型是否加载完成无关
+    /// （GET / 不经过翻译锁，模型冷加载期间也能秒回）。
+    /// 同时校验身份，避免把同一端口上的其它服务（如 LibreTranslate）误认作 NLLB 复用。
+    /// </summary>
+    private async Task<bool> IsNllbServerAliveAsync()
+    {
+        try
+        {
+            using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            using var resp = await probe.GetAsync($"{_baseUrl}/").ConfigureAwait(false);
+            var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            return body.Contains("NLLB", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
         }
     }
 

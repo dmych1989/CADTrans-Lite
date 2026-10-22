@@ -79,3 +79,8 @@ test_evict*
 test_full*
 test_extraction.csx
 make_sha512.py
+
+# ── Portable build staging & bundled third-party converter (large binaries) ──
+dist_portable/
+tools/ODAFileConverter/
+

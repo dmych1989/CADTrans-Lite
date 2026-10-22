@@ -170,3 +170,14 @@ Write-Host ""
 Write-Host "NLLB engine is ready." -ForegroundColor Green
 Write-Host "Model location: $ModelDir" -ForegroundColor White
 Write-Host "In CADTrans Lite, select the 'NLLB (local)' engine and click Test - no model download needed." -ForegroundColor White
+
+# ---------------------------------------------------------------------------
+# 应用 Python 运行时补丁（nllb_server.py 支持 chunked 请求体等修复）
+# tools/py 被 .gitignore 排除，源码修改以 tools/py_patches 形式随仓库分发。
+# ---------------------------------------------------------------------------
+$pyPatch = Join-Path $scriptDir "py_patches\apply_py_patches.ps1"
+if (Test-Path $pyPatch) {
+    Write-Host ""
+    & $pyPatch -PyDir $pyDir
+}
+
