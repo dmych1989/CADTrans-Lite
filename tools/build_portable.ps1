@@ -86,6 +86,26 @@ if (Test-Path $pySrc) {
     Write-Warning "tools\py 不存在，本地 LibreTranslate/NLLB 引擎将不可用。"
 }
 
+# 4.4) 补齐 VC++ 运行时（让绿色版在没有装 VC++ 2015-2022 可再发行组件的电脑上也能跑）
+#      torch / onnxruntime / tokenizers 等原生扩展都静态依赖 MSVCP140.dll + VCRUNTIME140.dll。
+#      python.exe 自带 vcruntime140(_1).dll，但**不带 msvcp140.dll**，干净系统上会报
+#      "DLL load failed: 找不到指定的模块"。把系统里的这几个 DLL 复制到 tools\py
+#      （= python.exe 所在目录，在 DLL 搜索路径里），即可免除外部依赖。
+#      注：这些文件属于 MSVC 可再发行组件，允许随应用一起分发。
+$vcDlls = @('msvcp140.dll','msvcp140_1.dll','msvcp140_2.dll','concrt140.dll','vcomp140.dll','vcruntime140.dll','vcruntime140_1.dll')
+$vcSrc = Join-Path $env:WINDIR 'System32'
+$vcCopied = 0
+foreach ($n in $vcDlls) {
+    $s = Join-Path $vcSrc $n
+    if (Test-Path $s) {
+        Copy-Item $s -Destination $pyDst -Force
+        $vcCopied++
+    } else {
+        Write-Warning "系统缺少 $n，绿色版在未安装 VC++ 2015-2022 运行库的电脑上可能无法加载 torch。"
+    }
+}
+Write-Output "[$(Get-Date)] 已随包附带 $vcCopied 个 VC++ 运行时 DLL。"
+
 # 4.5) 复制集成的 ODA File Converter（免安装、可再分发；DWG/DXF 转换开箱即用）
 $odaSrc = Join-Path $repoRoot 'tools\ODAFileConverter'
 if (Test-Path $odaSrc) {
