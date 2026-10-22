@@ -3,7 +3,7 @@
 CAD 图纸翻译工具（Lite 版）：从 AutoCAD `DXF/DWG` 图纸中提取可翻译文本（含 `TEXT`、`MTEXT`、`ATTRIB` 等），交给翻译引擎翻译后，再把译文**无损回填**到图纸，生成结构合法、可直接用 AutoCAD / 兼容软件打开的翻译后图纸。
 
 > 适用于建筑、机械、电气等工程图纸的中英（及多语言）翻译场景。
-
+![](https://gitcode.com/jileshijie/CADTrans-Lite/blob/main/%E8%BF%90%E5%8D%95.png)
 ## 功能特性
 
 - **Raw DXF 解析**：不依赖 AutoCAD，直接按组码（group code）逐行解析 DXF，保留原始编码、行结构与格式占位符（如 `%%`、字段代码），避免回填后结构损坏。
