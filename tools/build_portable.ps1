@@ -61,12 +61,16 @@ Write-Output "[$(Get-Date)] Publishing MCP bridge ..."
 if ($LASTEXITCODE -ne 0) { throw "MCP bridge publish failed: $LASTEXITCODE" }
 
 # 4) 复制嵌入式 Python 运行时（tools/py），但【排除模型目录】
-#    argos_packages/ 与 models/ 属于模型数据，单独打包分发，不进绿色版。
-function Copy-PyRuntime($src, $dst) {
+#    只排除 tools/py 顶层的 argos_packages/ 与 models/（模型数据单独打包分发）。
+#    ⚠ 不能按「目录名」递归排除：Lib/site-packages 下有多处叫 models 的**代码目录**
+#      （transformers\models 4550 个文件、stanza\models、onnxruntime\transformers\models 等），
+#      误删会让 `import transformers` 直接抛
+#      FileNotFoundError: ...\transformers\models → LibreTranslate 进程退出(1)、NLLB 翻译 500。
+function Copy-PyRuntime($src, $dst, [switch]$Root) {
     if (-not (Test-Path $dst)) { New-Item -ItemType Directory -Force -Path $dst | Out-Null }
     foreach ($item in Get-ChildItem $src) {
         if ($item.PSIsContainer) {
-            if ($item.Name -eq 'argos_packages' -or $item.Name -eq 'models') { continue }
+            if ($Root -and ($item.Name -eq 'argos_packages' -or $item.Name -eq 'models')) { continue }
             Copy-PyRuntime $item.FullName (Join-Path $dst $item.Name)
         } else {
             Copy-Item $item.FullName -Destination $dst -Force
@@ -76,8 +80,8 @@ function Copy-PyRuntime($src, $dst) {
 $pySrc = Join-Path $repoRoot 'tools\py'
 $pyDst = Join-Path $staging 'tools\py'
 if (Test-Path $pySrc) {
-    Write-Output "[$(Get-Date)] 复制嵌入式 Python 运行时（排除 argos_packages / models）..."
-    Copy-PyRuntime $pySrc $pyDst
+    Write-Output "[$(Get-Date)] 复制嵌入式 Python 运行时（仅排除顶层 argos_packages / models）..."
+    Copy-PyRuntime $pySrc $pyDst -Root
 } else {
     Write-Warning "tools\py 不存在，本地 LibreTranslate/NLLB 引擎将不可用。"
 }
@@ -112,6 +116,27 @@ if (Test-Path (Join-Path $repoRoot 'README.md')) {
 foreach ($md in @((Join-Path $staging 'bergamot'), (Join-Path $staging 'tools\bergamot'), (Join-Path $staging 'tools\py\argos_packages'), (Join-Path $staging 'tools\py\models'))) {
     if (Test-Path $md) { Remove-Item $md -Recurse -Force; Write-Output ("[$(Get-Date)] 已从绿色版移除: " + $md) }
 }
+
+# 5.6) 完整性自检：确认 site-packages 里的「代码目录」没有被误排除
+#      （历史上曾因为按目录名递归排除 models，把 transformers\models 一起删掉，
+#        导致解压后 LibreTranslate 启动即崩、NLLB 翻译 500）
+$critical = @(
+    'tools\py\Lib\site-packages\transformers\models',
+    'tools\py\Lib\site-packages\transformers\__init__.py',
+    'tools\py\Lib\site-packages\stanza\models',
+    'tools\py\Lib\site-packages\argostranslate\sbd.py',
+    'tools\py\nllb_server.py',
+    'tools\py\libretranslate_server.py'
+)
+$missing = @()
+foreach ($rel in $critical) {
+    if (-not (Test-Path (Join-Path $staging $rel))) { $missing += $rel }
+}
+if ($missing.Count -gt 0) {
+    Write-Error ("绿色版缺少关键文件，已中止打包：`n  " + ($missing -join "`n  "))
+    exit 1
+}
+Write-Output "[$(Get-Date)] 完整性自检通过（transformers\models 等关键目录齐全）。"
 
 # 6) 打包为 ZIP（根目录即软件文件，解压即跑）。用 ZipFile 以支持大文件/大体积。
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
